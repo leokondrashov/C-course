@@ -73,7 +73,7 @@ int SolveSquareEquation(double a, double b, double c, double *x1, double *x2) {
 		return SolveLinearEquation(b, c, x1);
 	} else {
 		double d = b * b - 4 * a * c;
-		if (abs(d) < EPS) {
+		if (fabs(d) < EPS) {
 			*x1 = -b / (2 * a);
 			*x2 = 0;
 			return 1;
