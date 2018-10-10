@@ -2,23 +2,32 @@
 
 #define START_SIZE 10
 
+#ifndef NDEBUG
+
 #define stackDump(s) { \
-printf("stack \"%s\" [%p]:\n", #s, &(s)); \
-printf("\tcapacity = %d\n", (s).capacity); \
-printf("\tsize = %d\n", (s).size); \
-printf("\terrno = %d\n", (s).errno); \
-printf("\tdata[%d]:[%p]\n", (s).size, (s).data); \
-for (int i = 0; i < (s).size; i++) \
-	printf("\t\t[%d] = %g\n", i, (s).data[i]); \
-printf("\n"); \
+	printf("stack \"%s\" [%p]:\n", #s, &(s)); \
+	printf("\tcapacity = %d\n", (s).capacity); \
+	printf("\tsize = %d\n", (s).size); \
+	printf("\terrno = %d\n", (s).errno); \
+	printf("\tdata[%d]:[%p]\n", (s).size, (s).data); \
+	for (int i = 0; i < (s).size; i++) \
+		printf("\t\t[%d] = %g\n", i, (s).data[i]); \
+	printf("\n"); \
 }
 
 #define ASSERT_OK(s) \
-if (!stackOk(s)) { \
-	stackDump(*(s)); \
-	assert(0); \
-}
+	if (!stackOk(s)) { \
+		stackDump(*(s)); \
+		assert(0); \
+	}
 
+#else
+
+#define stackDump(s) ;
+#define ASSERT_OK(s) ;
+
+#endif
+/*
 int main() {
 	stack s = {};
 	stackCtor(&s);
@@ -29,22 +38,28 @@ int main() {
 	}
 	printf("\n");
 	
+	stackDump(s);
+	
 	for (int i = 0; i < 20; i++) {
 		printf("%g ", stackPop(&s));
 	}
 	printf("\n");
 	
+	stackDump(s);
+	
 	stackDtor(&s);
 }
+*/
 
 void stackCtor(stack *s) {
 	assert(s);
 	
-	s->errno = 0;
+	s->errno = NO_ERROR;
 	s->capacity = 0;
 	s->data = NULL;
 	stackSetCapacity(s, START_SIZE);
 	s->size = 0;
+	s->hash = 0;
 }
 
 void stackDtor(stack *s) {
@@ -55,7 +70,8 @@ void stackDtor(stack *s) {
 	s->data = NULL;
 	s->size = 0;
 	s->capacity = 0;
-	s->errno = 0;
+	s->errno = NO_ERROR;
+	s->hash = 0;
 }
 
 void stackSetCapacity(stack *s, int c) {
@@ -64,7 +80,7 @@ void stackSetCapacity(stack *s, int c) {
 	
 	if (s->capacity == 0) {
 		if ((s->data = (data_t *)calloc(c, sizeof(data_t))) == NULL) {
-			s->errno = 1;
+			s->errno = ALLOCATION_ERROR;
 		} else {
 			s->capacity = c;
 		}
@@ -73,7 +89,7 @@ void stackSetCapacity(stack *s, int c) {
 	
 	data_t *tmp = realloc(s->data, c * sizeof(data_t));
 	if (tmp == NULL) {
-		s->errno = 2;
+		s->errno = REALLOCATION_ERROR;
 	} else {
 		s->capacity = c;
 		s->data = tmp;
@@ -86,10 +102,12 @@ int stackPush(stack *s, data_t val) {
 	
 	if (s->size == s->capacity) {
 		stackSetCapacity(s, s->capacity * 2);
-		assert(stackOk(s));
+		ASSERT_OK(s);
 	}
 	
 	s->data[s->size++] = val;
+	int x = *((int *) &val);
+	s->hash += x * s->size;
 	
 	return s->errno;
 }
@@ -99,7 +117,7 @@ data_t stackPop(stack *s) {
 	ASSERT_OK(s);
 	
 	if (s->size == 0) {
-		s->errno = 3;
+		s->errno = STACK_UNDERFLOW;
 		return 0;
 	}
 	
@@ -108,7 +126,10 @@ data_t stackPop(stack *s) {
 	if (s->size < s->capacity / 4) {
 		stackSetCapacity(s, s->capacity / 2);
 	}
-	assert(stackOk(s));
+	ASSERT_OK(s);
+	
+	int x = *((int *) &val);
+	s->hash -= x * (s->size + 1);
 	
 	return val;
 }
@@ -145,4 +166,16 @@ int stackOk(stack *s) {
 	if (s->errno != 0) return 0;
 	
 	return s->data && s->capacity && (s->size <= s->capacity);
+}
+
+int stackCheckHash(stack *s) {
+	int realHash = 0;
+	for (int i = 0; i < s->size; i++) {
+		realHash += (i + 1) * *((int *)(s->data + i));
+	}
+	if (s->hash == realHash) {
+		return 1;
+	} else {
+		return 0;
+	}
 }

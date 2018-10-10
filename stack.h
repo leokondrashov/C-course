@@ -3,14 +3,26 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef STACK_H
+
+#define STACK_H
+
 typedef float data_t;
 typedef struct stack stack;
+
+enum error {
+	NO_ERROR,
+	ALLOCATION_ERROR,
+	REALLOCATION_ERROR,
+	STACK_UNDERFLOW
+};
 
 struct stack {
 	data_t *data;
 	unsigned int size;
 	unsigned int capacity;
-	int errno;
+	enum error errno;
+	int hash;
 };
 
 void stackCtor(stack *s);
@@ -29,4 +41,6 @@ int stackErrno(stack *s);
 
 void stackClear(stack *s);
 
-void stackDump(stack *s);
+int stackCheckHash(stack *s);
+
+#endif
