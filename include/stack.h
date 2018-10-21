@@ -7,21 +7,21 @@
 
 #define STACK_H
 
-typedef float data_t;
+typedef int data_t;
 typedef struct stack stack;
 
-enum error {
-	NO_ERROR,
-	ALLOCATION_ERROR,
+enum stackError {
+	STACK_NO_ERROR,
+	STACK_ALLOCATION_ERROR,
 	REALLOCATION_ERROR,
-	STACK_UNDERFLOW
+	STACK_UNDERFLOW,
 };
 
 struct stack {
 	data_t *data;
 	unsigned int size;
 	unsigned int capacity;
-	enum error errno;
+	int errno;
 	int hash;
 };
 
@@ -42,5 +42,7 @@ int stackErrno(stack *s);
 void stackClear(stack *s);
 
 int stackCheckHash(stack *s);
+
+void stackDump(stack *s);
 
 #endif

@@ -1,0 +1,33 @@
+#ifndef CPU_H
+
+#define CPU_H
+
+#define REGISTERS_COUNT 16
+#define MEM_SIZE 512
+
+enum opcode {
+	END,
+	PUSH,
+	PUSHR,
+	PUSHMEM,
+	PUSHINDIR,
+	PUSHINDIROFFSET,
+	POP,
+	POPR,
+	POPMEM,
+	POPINDIR,
+	POPINDIROFFSET,
+	ADD,
+	SUB,
+	MUL,
+	DIV,
+	SQRT,
+	IN,
+	OUT,
+	JMP,
+	JA,
+	JB,
+	JE
+};
+
+#endif

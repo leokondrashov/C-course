@@ -1,29 +1,21 @@
-#include "stack.h"
+/*! \file stack.c
+* 
+*/
+
+#include <stack.h>
 
 #define START_SIZE 10
 
 #ifndef NDEBUG
 
-#define stackDump(s) { \
-	printf("stack \"%s\" [%p]:\n", #s, &(s)); \
-	printf("\tcapacity = %d\n", (s).capacity); \
-	printf("\tsize = %d\n", (s).size); \
-	printf("\terrno = %d\n", (s).errno); \
-	printf("\tdata[%d]:[%p]\n", (s).size, (s).data); \
-	for (int i = 0; i < (s).size; i++) \
-		printf("\t\t[%d] = %g\n", i, (s).data[i]); \
-	printf("\n"); \
-}
-
 #define ASSERT_OK(s) \
 	if (!stackOk(s)) { \
-		stackDump(*(s)); \
+		stackDump(s); \
 		assert(0); \
 	}
 
 #else
 
-#define stackDump(s) ;
 #define ASSERT_OK(s) ;
 
 #endif
@@ -51,16 +43,24 @@ int main() {
 }
 */
 
+/*!
+* \brief stack creator
+*/
+
 void stackCtor(stack *s) {
 	assert(s);
 	
-	s->errno = NO_ERROR;
+	s->errno = STACK_NO_ERROR;
 	s->capacity = 0;
 	s->data = NULL;
 	stackSetCapacity(s, START_SIZE);
 	s->size = 0;
 	s->hash = 0;
 }
+
+/*!
+* \brief stack destructor
+*/
 
 void stackDtor(stack *s) {
 	assert(s);
@@ -70,9 +70,13 @@ void stackDtor(stack *s) {
 	s->data = NULL;
 	s->size = 0;
 	s->capacity = 0;
-	s->errno = NO_ERROR;
+	s->errno = STACK_NO_ERROR;
 	s->hash = 0;
 }
+
+/*!
+* \brief change stack capacity to c
+*/
 
 void stackSetCapacity(stack *s, int c) {
 	assert(s);
@@ -80,7 +84,7 @@ void stackSetCapacity(stack *s, int c) {
 	
 	if (s->capacity == 0) {
 		if ((s->data = (data_t *)calloc(c, sizeof(data_t))) == NULL) {
-			s->errno = ALLOCATION_ERROR;
+			s->errno = STACK_ALLOCATION_ERROR;
 		} else {
 			s->capacity = c;
 		}
@@ -96,6 +100,10 @@ void stackSetCapacity(stack *s, int c) {
 	}
 }
 
+/*!
+* \brief push element with val to the top of the stck s
+*/
+
 int stackPush(stack *s, data_t val) {
 	assert(s);
 	ASSERT_OK(s);
@@ -106,11 +114,18 @@ int stackPush(stack *s, data_t val) {
 	}
 	
 	s->data[s->size++] = val;
+	
+	#ifdef CHECK_HASH
 	int x = *((int *) &val);
 	s->hash += x * s->size;
+	#endif
 	
 	return s->errno;
 }
+
+/*!
+* \brief pop top element from stack s
+*/
 
 data_t stackPop(stack *s) {
 	assert(s);
@@ -128,11 +143,17 @@ data_t stackPop(stack *s) {
 	}
 	ASSERT_OK(s);
 	
+	#ifdef CHECK_HASH
 	int x = *((int *) &val);
 	s->hash -= x * (s->size + 1);
+	#endif
 	
 	return val;
 }
+
+/*!
+* \brief clears stack s
+*/
 
 void stackClear(stack *s) {
 	assert(s);
@@ -140,7 +161,12 @@ void stackClear(stack *s) {
 	s->size = 0;
 	memset(s->data, 0, s->capacity * sizeof(data_t));
 	stackSetCapacity(s, START_SIZE);
+	s->hash = 0;
 }
+
+/*!
+* \return size of stack s
+*/
 
 unsigned int stackSize(stack *s) {
 	assert(s);
@@ -148,17 +174,30 @@ unsigned int stackSize(stack *s) {
 	return s->size;
 }
 
+/*!
+* \return capacity of stack s
+*/
+
 unsigned int stackCapacity(stack *s) {
 	assert(s);
 	
 	return s->capacity;
 }
 
+/*!
+* \return errno of stack s
+*/
+
 int stackErrno(stack *s) {
 	assert(s);
 	
 	return s->errno;
 }
+
+/*!
+* \brief check if stack s operable
+* \return 0 if stack isn't operable, non-zero otherwise
+*/
 
 int stackOk(stack *s) {
 	assert(s);
@@ -168,6 +207,11 @@ int stackOk(stack *s) {
 	return s->data && s->capacity && (s->size <= s->capacity);
 }
 
+/*!
+* \brief check precomputed hash with real hash
+*/
+
+#ifdef CHECK_HASH
 int stackCheckHash(stack *s) {
 	int realHash = 0;
 	for (int i = 0; i < s->size; i++) {
@@ -178,4 +222,26 @@ int stackCheckHash(stack *s) {
 	} else {
 		return 0;
 	}
+}
+#else
+int stackCheckHash(stack *s) {
+	return 1;
+}
+#endif
+
+/*!
+* \brief prints debug information
+*/
+
+void stackDump(stack *s) {
+	printf("stack [%p] {\n", s);
+	printf("\tcapacity = %d\n", s->capacity);
+	printf("\tsize = %d\n", s->size);
+	printf("\terrno = %d\n", s->errno);
+	printf("\thash = %d\n", s->hash);
+	printf("\tdata[%d]:[%p] {\n", s->size, s->data);
+	for (int i = 0; i < s->size; i++)
+		printf("\t\t[%d] = %d\n", i, s->data[i]);
+	printf("\t}\n");
+	printf("}\n");
 }
