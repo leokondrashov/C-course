@@ -31,7 +31,7 @@ char **readTextFromFile(const char *file) {
 		lines[++i] = it + 1;
 		*it = '\0';
 	}
-	lines[i] = NULL;
+	lines[++i] = NULL;
 	
 	return lines;
 }
@@ -75,6 +75,7 @@ void writeToFile(const char *file, const char **lines) {
 		fwrite(*lines, sizeof(char), strlen(*lines), out);
 		fwrite("\n", sizeof(char), 1, out);
 	} while (*(++lines));
+	fclose(out);
 }
 
 /*
@@ -124,8 +125,8 @@ int getLine(char buff[], int maxSize) {
 
 void sort(char *lines[], int left, int right, int (*comp)(const char *, const char *)) {
 	void swap(char *lines[], int i, int j);
-	assert(lines != NULL);	
-	
+	assert(lines != NULL);
+
 	int last;
 	
 	if (left >= right)
@@ -150,9 +151,9 @@ void sort(char *lines[], int left, int right, int (*comp)(const char *, const ch
 
 void swap(char *lines[], int i, int j) {
 	assert(lines != NULL);
-	
+
 	char *t;
-	
+
 	t = lines[i];
 	lines[i] = lines[j];
 	lines[j] = t;

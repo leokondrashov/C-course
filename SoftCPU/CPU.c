@@ -117,6 +117,7 @@ void CPUDump(struct CPU *cpu) {
 
 int CPULoadProgramFromFile(struct CPU *cpu, char *file) {
 	assert(cpu);
+	assert(file);
 	
 	int size = sizeofFile(file);
 	if (size < 0) {
@@ -147,200 +148,201 @@ int CPURunProgram(struct CPU *cpu) {
 	while (cpu->program[cpu->ip]) {
 		int a = 0, b = 0, addr = 0;
 		switch(cpu->program[cpu->ip]) {
-			case PUSH:
-				a = *((int *)&cpu->program[cpu->ip + 1]);
-				stackPush(&cpu->st, a);
-				cpu->ip += 1 + sizeof(int);
-				break;
-			case PUSHR:
-				a = *((int *)&cpu->program[cpu->ip + 1]);
-				if (a >= REGISTERS_COUNT) {
-					cpu->errno = ADDRESS_OUT_OF_MEMORY;
-					return 0;
-				}
-				stackPush(&cpu->st, cpu->r[a]);
-				cpu->ip += 1 + sizeof(int);
-				break;
-			case PUSHMEM:
-				a = *((int *)&cpu->program[cpu->ip + 1]);
-				if (a >= MEM_SIZE) {
-					cpu->errno = ADDRESS_OUT_OF_MEMORY;
-					return 0;
-				}
-				stackPush(&cpu->st, cpu->mem[a]);
-				sleep(1);
-				cpu->ip += 1 + sizeof(int);
-				break;
-			case PUSHINDIR:
-				a = *((int *)&cpu->program[cpu->ip + 1]);
-				if (a >= REGISTERS_COUNT || cpu->r[a] >= MEM_SIZE) {
-					cpu->errno = ADDRESS_OUT_OF_MEMORY;
-					return 0;
-				}
-				stackPush(&cpu->st, cpu->mem[cpu->r[a]]);
-				sleep(1);
-				cpu->ip += 1 + sizeof(int);
-				break;
-			case PUSHINDIROFFSET:
-				a = *((int *)&cpu->program[cpu->ip + 1]);
-				b = *((int *)&cpu->program[cpu->ip + 1 + sizeof(int)]);
-				if (a >= REGISTERS_COUNT || cpu->r[a] + b >= MEM_SIZE) {
-					cpu->errno = ADDRESS_OUT_OF_MEMORY;
-					return 0;
-				}
-				stackPush(&cpu->st, cpu->mem[cpu->r[a] + b]);
-				sleep(1);
-				cpu->ip += 1 + 2 * sizeof(int);
-				break;
-			
-			case POP:
-				stackPop(&cpu->st);
-				cpu->ip++;
-				break;
-			case POPR:
-				a = *((int *)&cpu->program[cpu->ip + 1]);
-				if (a >= REGISTERS_COUNT) {
-					cpu->errno = ADDRESS_OUT_OF_MEMORY;
-					return 0;
-				}
-				cpu->r[a] = stackPop(&cpu->st);
-				cpu->ip += 1 + sizeof(int);
-				break;
-			case POPMEM:
-				a = *((int *)&cpu->program[cpu->ip + 1]);
-				if (a >= MEM_SIZE) {
-					cpu->errno = ADDRESS_OUT_OF_MEMORY;
-					return 0;
-				}
-				cpu->mem[a] = stackPop(&cpu->st);
-				sleep(1);
-				cpu->ip += 1 + sizeof(int);
-				break;
-			case POPINDIR:
-				a = *((int *)&cpu->program[cpu->ip + 1]);
-				if (a >= REGISTERS_COUNT || cpu->r[a] >= MEM_SIZE) {
-					cpu->errno = ADDRESS_OUT_OF_MEMORY;
-					return 0;
-				}
-				cpu->mem[cpu->r[a]] = stackPop(&cpu->st);
-				sleep(1);
-				cpu->ip += 1 + sizeof(int);
-				break;
-			case POPINDIROFFSET:
-				a = *((int *)&cpu->program[cpu->ip + 1]);
-				b = *((int *)&cpu->program[cpu->ip + 1 + sizeof(int)]);
-				if (a >= REGISTERS_COUNT || cpu->r[a] + b >= MEM_SIZE) {
-					cpu->errno = ADDRESS_OUT_OF_MEMORY;
-					return 0;
-				}
-				cpu->mem[cpu->r[a] + b] = stackPop(&cpu->st);
-				sleep(1);
-				cpu->ip += 1 + 2 * sizeof(int);
-				break;
-				
-			case ADD:
-				a = stackPop(&cpu->st);
-				b = stackPop(&cpu->st);
-				stackPush(&cpu->st, a + b);
-				cpu->ip++;
-				break;
-			case SUB:
-				a = stackPop(&cpu->st);
-				b = stackPop(&cpu->st);
-				stackPush(&cpu->st, b - a);
-				cpu->ip++;
-				break;
-			case MUL:
-				a = stackPop(&cpu->st);
-				b = stackPop(&cpu->st);
-				stackPush(&cpu->st, a * b);
-				cpu->ip++;
-				break;
-			case DIV:
-				a = stackPop(&cpu->st);
-				b = stackPop(&cpu->st);
-				stackPush(&cpu->st, b / a);
-				cpu->ip++;
-				break;
-			case SQRT:
-				stackPush(&cpu->st, (int)sqrt(stackPop(&cpu->st)));
-				cpu->ip++;
-				break;
-				
-			case IN:
-				a = 0;
-				scanf("%d", &a);
-				stackPush(&cpu->st, a);
-				cpu->ip++;
-				break;
-			case OUT:
-				printf("%d\n", stackPop(&cpu->st));
-				cpu->ip++;
-				break;
-				
-			case JMP:
-				addr = *((int *)&cpu->program[cpu->ip + 1]);
-				if (addr >= cpu->programSize) {
-					cpu->errno = IP_OUT_OF_PROG;
-					return 0;
-				}
-				cpu->ip = addr;
-				break;
-			case JA:
-				addr = *((int *)&cpu->program[cpu->ip + 1]);
-				if (addr >= cpu->programSize) {
-					cpu->errno = IP_OUT_OF_PROG;
-					return 0;
-				}
-				a = stackPop(&cpu->st);
-				b = stackPop(&cpu->st);
-				if (b > a)
-					cpu->ip = addr;
-				else
-					cpu->ip += 1 + sizeof(int);
-				break;
-			case JB:
-				addr = *((int *)&cpu->program[cpu->ip + 1]);
-				if (addr >= cpu->programSize) {
-					cpu->errno = IP_OUT_OF_PROG;
-					return 0;
-				}
-				a = stackPop(&cpu->st);
-				b = stackPop(&cpu->st);
-				if (b < a)
-					cpu->ip = addr;
-				else
-					cpu->ip += 1 + sizeof(int);
-				break;
-			case JE:
-				addr = *((int *)&cpu->program[cpu->ip + 1]);
-				if (addr >= cpu->programSize) {
-					cpu->errno = IP_OUT_OF_PROG;
-					return 0;
-				}
-				a = stackPop(&cpu->st);
-				b = stackPop(&cpu->st);
-				if (b == a)
-					cpu->ip = addr;
-				else
-					cpu->ip += 1 + sizeof(int);
-				break;
-			
-			default:
-				cpu->errno = UNKNOWN_OPCODE;
+		case PUSH:
+			a = *((int *) &cpu->program[cpu->ip+1]);
+			stackPush(&cpu->st, a);
+			cpu->ip += 1+sizeof(int);
+			break;
+		case PUSHR:
+			a = *((int *) &cpu->program[cpu->ip+1]);
+			if (a>=REGISTERS_COUNT) {
+				cpu->errno = ADDRESS_OUT_OF_MEMORY;
 				return 0;
+			}
+			stackPush(&cpu->st, cpu->r[a]);
+			cpu->ip += 1+sizeof(int);
+			break;
+		case PUSHMEM:
+			a = *((int *) &cpu->program[cpu->ip+1]);
+			if (a>=MEM_SIZE) {
+				cpu->errno = ADDRESS_OUT_OF_MEMORY;
+				return 0;
+			}
+			stackPush(&cpu->st, cpu->mem[a]);
+			sleep(1);
+			cpu->ip += 1+sizeof(int);
+			break;
+		case PUSHINDIR:
+			a = *((int *) &cpu->program[cpu->ip+1]);
+			if (a>=REGISTERS_COUNT || cpu->r[a]>=MEM_SIZE) {
+				cpu->errno = ADDRESS_OUT_OF_MEMORY;
+				return 0;
+			}
+			stackPush(&cpu->st, cpu->mem[cpu->r[a]]);
+			sleep(1);
+			cpu->ip += 1+sizeof(int);
+			break;
+		case PUSHINDIROFFSET:
+			a = *((int *) &cpu->program[cpu->ip+1]);
+			b = *((int *) &cpu->program[cpu->ip+1+sizeof(int)]);
+			if (a>=REGISTERS_COUNT || cpu->r[a]+b>=MEM_SIZE) {
+				cpu->errno = ADDRESS_OUT_OF_MEMORY;
+				return 0;
+			}
+			stackPush(&cpu->st, cpu->mem[cpu->r[a]+b]);
+			sleep(1);
+			cpu->ip += 1+2*sizeof(int);
+			break;
+
+		case POP:
+			stackPop(&cpu->st);
+			cpu->ip++;
+			break;
+		case POPR:
+			a = *((int *) &cpu->program[cpu->ip+1]);
+			if (a>=REGISTERS_COUNT) {
+				cpu->errno = ADDRESS_OUT_OF_MEMORY;
+				return 0;
+			}
+			cpu->r[a] = stackPop(&cpu->st);
+			cpu->ip += 1+sizeof(int);
+			break;
+		case POPMEM:
+			a = *((int *) &cpu->program[cpu->ip+1]);
+			if (a>=MEM_SIZE) {
+				cpu->errno = ADDRESS_OUT_OF_MEMORY;
+				return 0;
+			}
+			cpu->mem[a] = stackPop(&cpu->st);
+			sleep(1);
+			cpu->ip += 1+sizeof(int);
+			break;
+		case POPINDIR:
+			a = *((int *) &cpu->program[cpu->ip+1]);
+			if (a>=REGISTERS_COUNT || cpu->r[a]>=MEM_SIZE) {
+				cpu->errno = ADDRESS_OUT_OF_MEMORY;
+				return 0;
+			}
+			cpu->mem[cpu->r[a]] = stackPop(&cpu->st);
+			sleep(1);
+			cpu->ip += 1+sizeof(int);
+			break;
+		case POPINDIROFFSET:
+			a = *((int *) &cpu->program[cpu->ip+1]);
+			b = *((int *) &cpu->program[cpu->ip+1+sizeof(int)]);
+			if (a>=REGISTERS_COUNT || cpu->r[a]+b>=MEM_SIZE) {
+				cpu->errno = ADDRESS_OUT_OF_MEMORY;
+				return 0;
+			}
+			cpu->mem[cpu->r[a]+b] = stackPop(&cpu->st);
+			sleep(1);
+			cpu->ip += 1+2*sizeof(int);
+			break;
+
+		case ADD:
+			a = stackPop(&cpu->st);
+			b = stackPop(&cpu->st);
+			stackPush(&cpu->st, a+b);
+			cpu->ip++;
+			break;
+		case SUB:
+			a = stackPop(&cpu->st);
+			b = stackPop(&cpu->st);
+			stackPush(&cpu->st, b-a);
+			cpu->ip++;
+			break;
+		case MUL:
+			a = stackPop(&cpu->st);
+			b = stackPop(&cpu->st);
+			stackPush(&cpu->st, a*b);
+			cpu->ip++;
+			break;
+		case DIV:
+			a = stackPop(&cpu->st);
+			b = stackPop(&cpu->st);
+			stackPush(&cpu->st, b/a);
+			cpu->ip++;
+			break;
+		case SQRT:
+			stackPush(&cpu->st, (int) sqrt(stackPop(&cpu->st)));
+			cpu->ip++;
+			break;
+
+		case IN:
+			a = 0;
+			scanf("%d", &a);
+			stackPush(&cpu->st, a);
+			cpu->ip++;
+			break;
+		case OUT:
+			printf("%d\n", stackPop(&cpu->st));
+			cpu->ip++;
+			break;
+
+		case JMP:
+			addr = *((int *) &cpu->program[cpu->ip+1]);
+			if (addr>=cpu->programSize) {
+				cpu->errno = IP_OUT_OF_PROG;
+				return 0;
+			}
+			cpu->ip = addr;
+			break;
+		case JA:
+			addr = *((int *) &cpu->program[cpu->ip+1]);
+			if (addr>=cpu->programSize) {
+				cpu->errno = IP_OUT_OF_PROG;
+				return 0;
+			}
+			a = stackPop(&cpu->st);
+			b = stackPop(&cpu->st);
+			if (b>a)
+				cpu->ip = addr;
+			else
+				cpu->ip += 1+sizeof(int);
+			break;
+		case JB:
+			addr = *((int *) &cpu->program[cpu->ip+1]);
+			if (addr>=cpu->programSize) {
+				cpu->errno = IP_OUT_OF_PROG;
+				return 0;
+			}
+			a = stackPop(&cpu->st);
+			b = stackPop(&cpu->st);
+			if (b<a)
+				cpu->ip = addr;
+			else
+				cpu->ip += 1+sizeof(int);
+			break;
+		case JE:
+			addr = *((int *) &cpu->program[cpu->ip+1]);
+			if (addr>=cpu->programSize) {
+				cpu->errno = IP_OUT_OF_PROG;
+				return 0;
+			}
+			a = stackPop(&cpu->st);
+			b = stackPop(&cpu->st);
+			if (b==a)
+				cpu->ip = addr;
+			else
+				cpu->ip += 1+sizeof(int);
+			break;
+
+		default:
+			cpu->errno = UNKNOWN_OPCODE;
+			return 0;
 		}
 	}
 	return 1;
 }
 
 int main(int argc, char *argv[]) {
-	struct CPU cpu = {};
-	CPUCtor(&cpu);
 	if (argc < 2) {
 		printf("missing file\n");
 		printf("using format: CPU file\n");
+		return 0;
 	}
+	struct CPU cpu = {};
+	CPUCtor(&cpu);
 	CPULoadProgramFromFile(&cpu, argv[1]);
 	CPURunProgram(&cpu);
 	CPUDump(&cpu);
