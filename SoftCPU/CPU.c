@@ -346,6 +346,6 @@ int main(int argc, char *argv[]) {
 	CPUCtor(&cpu);
 	CPULoadProgramFromFile(&cpu, argv[1]);
 	CPURunProgram(&cpu);
-	CPUDump(&cpu);
+//	CPUDump(&cpu);
 	CPUDtor(&cpu);
 }

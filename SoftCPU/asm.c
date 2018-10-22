@@ -16,30 +16,38 @@ struct node {
 int error = 0;
 
 void processSource(const char *infile, const char *lstfile, const char *outfile);
-void compile(const char **source, const int nLines, const char *lstfile, const char *outfile);
+void compile(const char **source, int nLines, const char *lstfile, const char *outfile);
 
 int main(int argc, char *argv[]) {
 	if (argc < 2) {
 		printf("missing file\n");
-		printf("using format: CPU file [-l listing_file] [-o output_file]\n");
+		printf("using format: asm file [-l listing_file] [-o output_file]\n");
 		return 0;
 	}
 
 	char *infile = NULL, *lstfile = NULL, *outfile = NULL;
 	for (int i = 1; i < argc; i++) {
 		if (argv[i][0] == '-') {
-			if (argv[i][1]=='l' && lstfile==NULL) {
+			if (argv[i][1] == 'l' && lstfile == NULL) {
 				lstfile = argv[++i];
-			}
-			else if (argv[i][1]=='o' && outfile==NULL) {
+			} else if (argv[i][1] == 'o' && outfile == NULL) {
 				outfile = argv[++i];
+			} else {
+				printf("Unknown flag: %s", argv[i]);
+				return 0;
 			}
-		}else if (infile == NULL) {
+		} else if (infile == NULL) {
 			infile = argv[i];
 		} else {
-			printf("using format: CPU file [-l listing_file] [-o output_file]\n");
+			printf("using format: asm file [-l listing_file] [-o output_file]\n");
 			return 0;
 		}
+	}
+
+	if (infile == NULL) {
+		printf("missing file\n");
+		printf("using format: asm file [-l listing_file] [-o output_file]\n");
+		return 0;
 	}
 
 	if (lstfile == NULL) {
@@ -55,11 +63,26 @@ int main(int argc, char *argv[]) {
 
 
 void freeLabels(struct node *head) {
+	assert(head);
+
 	if (head == NULL)
 		return;
 	freeLabels(head->next);
 	free(head->str);
 	free(head);
+}
+
+void writeLabels(FILE *lst) {
+	assert(lst);
+
+	if (head == NULL)
+		return;
+	fprintf(lst, "labels:\n");
+	struct node *cur = head;
+	while (cur) {
+		fprintf(lst, "\t%s: %08x\n", cur->str, cur->val);
+		cur = cur->next;
+	}
 }
 
 void processSource(const char *infile, const char *lstfile, const char *outfile) {
@@ -89,6 +112,8 @@ void processSource(const char *infile, const char *lstfile, const char *outfile)
 }
 
 int isLabel(const char *line) {
+	assert(line);
+
 	char *tmp = (char *)calloc(1, sizeof(char));
 	int val = sscanf(line, "%[a-zA-Z_0-9]%[:]", tmp, tmp);
 	free(tmp);
@@ -96,6 +121,8 @@ int isLabel(const char *line) {
 }
 
 int getLabelAddress(const char *line) {
+	assert(line);
+
 	if (head == NULL)
 		return -1;
 	for (struct node *cur = head; cur; cur = cur->next) {
@@ -106,24 +133,33 @@ int getLabelAddress(const char *line) {
 }
 
 void addLabel(char *line, int val) {
+	assert(line);
+
+	char *str = (char *)calloc(10, sizeof(char));
+	sscanf(line, "%[a-zA-Z_0-9]%*[:]", str);
 	if (head == NULL) {
 		head = (struct node *)calloc(1, sizeof(struct node));
 		head->next = NULL;
 		head->val = val;
-		char *str = (char *)calloc(10, sizeof(char));
-		sscanf(line, "%[a-zA-Z_0-9]%*[:]", str);
 		head->str = str;
 		return;
 	}
 
 	struct node *cur = head;
-	while (cur->next)
+	while (cur->next) {
+		if (strcasecmp(cur->str, str) == 0) {
+			free(str);
+			return;
+		}
 		cur = cur->next;
+	}
+	if (strcasecmp(cur->str, str) == 0) {
+		free(str);
+		return;
+	}
 	cur->next = (struct node *)calloc(1, sizeof(struct node));
 	cur->next->next = NULL;
 	cur->next->val = val;
-	char *str = (char *)calloc(10, sizeof(char));
-	sscanf(line, "%[a-zA-Z_0-9]%*[:]", str);
 	cur->next->str = str;
 }
 
@@ -490,7 +526,7 @@ void compile(const char **source, const int nLines, const char *lstfile, const c
 		}
 	}
 
-//	writeLabels();
+	writeLabels(lst);
 
 	free(combuff);
 	free(argbuff);
