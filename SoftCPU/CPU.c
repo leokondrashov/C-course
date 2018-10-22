@@ -149,49 +149,49 @@ int CPURunProgram(struct CPU *cpu) {
 		int a = 0, b = 0, addr = 0;
 		switch(cpu->program[cpu->ip]) {
 		case PUSH:
-			a = *((int *) &cpu->program[cpu->ip+1]);
+			a = *((int *) &cpu->program[cpu->ip + 1]);
 			stackPush(&cpu->st, a);
-			cpu->ip += 1+sizeof(int);
+			cpu->ip += 1 + sizeof(int);
 			break;
 		case PUSHR:
-			a = *((int *) &cpu->program[cpu->ip+1]);
-			if (a>=REGISTERS_COUNT) {
+			a = *((int *) &cpu->program[cpu->ip + 1]);
+			if (a >= REGISTERS_COUNT) {
 				cpu->errno = ADDRESS_OUT_OF_MEMORY;
 				return 0;
 			}
 			stackPush(&cpu->st, cpu->r[a]);
-			cpu->ip += 1+sizeof(int);
+			cpu->ip += 1 + sizeof(int);
 			break;
 		case PUSHMEM:
-			a = *((int *) &cpu->program[cpu->ip+1]);
-			if (a>=MEM_SIZE) {
+			a = *((int *) &cpu->program[cpu->ip + 1]);
+			if (a >= MEM_SIZE) {
 				cpu->errno = ADDRESS_OUT_OF_MEMORY;
 				return 0;
 			}
 			stackPush(&cpu->st, cpu->mem[a]);
 			sleep(1);
-			cpu->ip += 1+sizeof(int);
+			cpu->ip += 1 + sizeof(int);
 			break;
 		case PUSHINDIR:
-			a = *((int *) &cpu->program[cpu->ip+1]);
-			if (a>=REGISTERS_COUNT || cpu->r[a]>=MEM_SIZE) {
+			a = *((int *) &cpu->program[cpu->ip + 1]);
+			if (a >= REGISTERS_COUNT || cpu->r[a] >= MEM_SIZE) {
 				cpu->errno = ADDRESS_OUT_OF_MEMORY;
 				return 0;
 			}
 			stackPush(&cpu->st, cpu->mem[cpu->r[a]]);
 			sleep(1);
-			cpu->ip += 1+sizeof(int);
+			cpu->ip += 1 + sizeof(int);
 			break;
 		case PUSHINDIROFFSET:
-			a = *((int *) &cpu->program[cpu->ip+1]);
-			b = *((int *) &cpu->program[cpu->ip+1+sizeof(int)]);
-			if (a>=REGISTERS_COUNT || cpu->r[a]+b>=MEM_SIZE) {
+			a = *((int *) &cpu->program[cpu->ip + 1]);
+			b = *((int *) &cpu->program[cpu->ip + 1 + sizeof(int)]);
+			if (a >= REGISTERS_COUNT || cpu->r[a] + b >= MEM_SIZE) {
 				cpu->errno = ADDRESS_OUT_OF_MEMORY;
 				return 0;
 			}
-			stackPush(&cpu->st, cpu->mem[cpu->r[a]+b]);
+			stackPush(&cpu->st, cpu->mem[cpu->r[a] + b]);
 			sleep(1);
-			cpu->ip += 1+2*sizeof(int);
+			cpu->ip += 1 + 2 * sizeof(int);
 			break;
 
 		case POP:
@@ -199,68 +199,68 @@ int CPURunProgram(struct CPU *cpu) {
 			cpu->ip++;
 			break;
 		case POPR:
-			a = *((int *) &cpu->program[cpu->ip+1]);
-			if (a>=REGISTERS_COUNT) {
+			a = *((int *) &cpu->program[cpu->ip + 1]);
+			if (a >= REGISTERS_COUNT) {
 				cpu->errno = ADDRESS_OUT_OF_MEMORY;
 				return 0;
 			}
 			cpu->r[a] = stackPop(&cpu->st);
-			cpu->ip += 1+sizeof(int);
+			cpu->ip += 1 + sizeof(int);
 			break;
 		case POPMEM:
-			a = *((int *) &cpu->program[cpu->ip+1]);
-			if (a>=MEM_SIZE) {
+			a = *((int *) &cpu->program[cpu->ip + 1]);
+			if (a >= MEM_SIZE) {
 				cpu->errno = ADDRESS_OUT_OF_MEMORY;
 				return 0;
 			}
 			cpu->mem[a] = stackPop(&cpu->st);
 			sleep(1);
-			cpu->ip += 1+sizeof(int);
+			cpu->ip += 1 + sizeof(int);
 			break;
 		case POPINDIR:
-			a = *((int *) &cpu->program[cpu->ip+1]);
-			if (a>=REGISTERS_COUNT || cpu->r[a]>=MEM_SIZE) {
+			a = *((int *) &cpu->program[cpu->ip + 1]);
+			if (a >= REGISTERS_COUNT || cpu->r[a] >= MEM_SIZE) {
 				cpu->errno = ADDRESS_OUT_OF_MEMORY;
 				return 0;
 			}
 			cpu->mem[cpu->r[a]] = stackPop(&cpu->st);
 			sleep(1);
-			cpu->ip += 1+sizeof(int);
+			cpu->ip += 1 + sizeof(int);
 			break;
 		case POPINDIROFFSET:
-			a = *((int *) &cpu->program[cpu->ip+1]);
-			b = *((int *) &cpu->program[cpu->ip+1+sizeof(int)]);
-			if (a>=REGISTERS_COUNT || cpu->r[a]+b>=MEM_SIZE) {
+			a = *((int *) &cpu->program[cpu->ip + 1]);
+			b = *((int *) &cpu->program[cpu->ip + 1 + sizeof(int)]);
+			if (a >= REGISTERS_COUNT || cpu->r[a] + b >= MEM_SIZE) {
 				cpu->errno = ADDRESS_OUT_OF_MEMORY;
 				return 0;
 			}
-			cpu->mem[cpu->r[a]+b] = stackPop(&cpu->st);
+			cpu->mem[cpu->r[a] + b] = stackPop(&cpu->st);
 			sleep(1);
-			cpu->ip += 1+2*sizeof(int);
+			cpu->ip += 1 + 2 * sizeof(int);
 			break;
 
 		case ADD:
 			a = stackPop(&cpu->st);
 			b = stackPop(&cpu->st);
-			stackPush(&cpu->st, a+b);
+			stackPush(&cpu->st, a + b);
 			cpu->ip++;
 			break;
 		case SUB:
 			a = stackPop(&cpu->st);
 			b = stackPop(&cpu->st);
-			stackPush(&cpu->st, b-a);
+			stackPush(&cpu->st, b - a);
 			cpu->ip++;
 			break;
 		case MUL:
 			a = stackPop(&cpu->st);
 			b = stackPop(&cpu->st);
-			stackPush(&cpu->st, a*b);
+			stackPush(&cpu->st, a * b);
 			cpu->ip++;
 			break;
 		case DIV:
 			a = stackPop(&cpu->st);
 			b = stackPop(&cpu->st);
-			stackPush(&cpu->st, b/a);
+			stackPush(&cpu->st, b / a);
 			cpu->ip++;
 			break;
 		case SQRT:
@@ -276,55 +276,56 @@ int CPURunProgram(struct CPU *cpu) {
 			break;
 		case OUT:
 			printf("%d\n", stackPop(&cpu->st));
+//			CPUDump(cpu);
 			cpu->ip++;
 			break;
 
 		case JMP:
-			addr = *((int *) &cpu->program[cpu->ip+1]);
-			if (addr>=cpu->programSize) {
+			addr = *((int *) &cpu->program[cpu->ip + 1]);
+			if (addr >= cpu->programSize) {
 				cpu->errno = IP_OUT_OF_PROG;
 				return 0;
 			}
 			cpu->ip = addr;
 			break;
 		case JA:
-			addr = *((int *) &cpu->program[cpu->ip+1]);
-			if (addr>=cpu->programSize) {
+			addr = *((int *) &cpu->program[cpu->ip + 1]);
+			if (addr >= cpu->programSize) {
 				cpu->errno = IP_OUT_OF_PROG;
 				return 0;
 			}
 			a = stackPop(&cpu->st);
 			b = stackPop(&cpu->st);
-			if (b>a)
+			if (b > a)
 				cpu->ip = addr;
 			else
-				cpu->ip += 1+sizeof(int);
+				cpu->ip += 1 + sizeof(int);
 			break;
 		case JB:
-			addr = *((int *) &cpu->program[cpu->ip+1]);
-			if (addr>=cpu->programSize) {
+			addr = *((int *) &cpu->program[cpu->ip + 1]);
+			if (addr >= cpu->programSize) {
 				cpu->errno = IP_OUT_OF_PROG;
 				return 0;
 			}
 			a = stackPop(&cpu->st);
 			b = stackPop(&cpu->st);
-			if (b<a)
+			if (b < a)
 				cpu->ip = addr;
 			else
-				cpu->ip += 1+sizeof(int);
+				cpu->ip += 1 + sizeof(int);
 			break;
 		case JE:
-			addr = *((int *) &cpu->program[cpu->ip+1]);
-			if (addr>=cpu->programSize) {
+			addr = *((int *) &cpu->program[cpu->ip + 1]);
+			if (addr >= cpu->programSize) {
 				cpu->errno = IP_OUT_OF_PROG;
 				return 0;
 			}
 			a = stackPop(&cpu->st);
 			b = stackPop(&cpu->st);
-			if (b==a)
+			if (b == a)
 				cpu->ip = addr;
 			else
-				cpu->ip += 1+sizeof(int);
+				cpu->ip += 1 + sizeof(int);
 			break;
 
 		default:

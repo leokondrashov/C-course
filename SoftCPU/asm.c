@@ -11,7 +11,7 @@ struct node {
   struct node *next;
   char *str;
   int val;
-};
+} *head = NULL;
 
 int error = 0;
 
@@ -53,6 +53,15 @@ int main(int argc, char *argv[]) {
 	processSource(infile, lstfile, outfile);
 }
 
+
+void freeLabels(struct node *head) {
+	if (head == NULL)
+		return;
+	freeLabels(head->next);
+	free(head->str);
+	free(head);
+}
+
 void processSource(const char *infile, const char *lstfile, const char *outfile) {
 	assert(infile);
 	assert(lstfile);
@@ -66,27 +75,56 @@ void processSource(const char *infile, const char *lstfile, const char *outfile)
 	int nLines = countLines(source);
 
 	compile(source, nLines, lstfile, outfile);
-//	compile(source, nLines, lstfile, outfile); // for correct labels
+	if (!error)
+		compile(source, nLines, lstfile, outfile); // for correct labels
 
 	if (error) {
 		remove(lstfile);
 		remove(outfile);
 	}
 
+	freeLabels(head);
 	free(source[0]);
 	free(source);
 }
 
 int isLabel(const char *line) {
-	return 0;
+	char *tmp = (char *)calloc(1, sizeof(char));
+	int val = sscanf(line, "%[a-zA-Z_0-9]%[:]", tmp, tmp);
+	free(tmp);
+	return val == 2;
 }
 
 int getLabelAddress(const char *line) {
-	return 0;
+	if (head == NULL)
+		return -1;
+	for (struct node *cur = head; cur; cur = cur->next) {
+		if (strcasecmp(line, cur->str) == 0)
+			return cur->val;
+	}
+	return -1;
 }
 
-void addLabel(const char *line, int val) {
+void addLabel(char *line, int val) {
+	if (head == NULL) {
+		head = (struct node *)calloc(1, sizeof(struct node));
+		head->next = NULL;
+		head->val = val;
+		char *str = (char *)calloc(10, sizeof(char));
+		sscanf(line, "%[a-zA-Z_0-9]%*[:]", str);
+		head->str = str;
+		return;
+	}
 
+	struct node *cur = head;
+	while (cur->next)
+		cur = cur->next;
+	cur->next = (struct node *)calloc(1, sizeof(struct node));
+	cur->next->next = NULL;
+	cur->next->val = val;
+	char *str = (char *)calloc(10, sizeof(char));
+	sscanf(line, "%[a-zA-Z_0-9]%*[:]", str);
+	cur->next->str = str;
 }
 
 void compile(const char **source, const int nLines, const char *lstfile, const char *outfile) {
@@ -103,6 +141,8 @@ void compile(const char **source, const int nLines, const char *lstfile, const c
 		combuff[0] = '\0';
 		argbuff[0] = '\0';
 		sscanf(source[i], "%s %[^;]", combuff, argbuff);
+		if (strlen(source[i]) == 0)
+			continue;
 		if (strcasecmp(combuff, "end") == 0) {
 			fprintf(out, "%c", (char)END);
 			fprintf(lst, "%08x: %02x -> END\n", pc, END);
@@ -362,7 +402,7 @@ void compile(const char **source, const int nLines, const char *lstfile, const c
 				fprintf(lst, "%02x ", (unsigned char)tmp[it]);
 				fprintf(out, "%c", tmp[it]);
 			}
-			fprintf(lst, "-> JMP %x\n", addr);
+			fprintf(lst, "-> JMP %08x\n", addr);
 
 			pc += 1 + sizeof(int);
 			free(tmp);
@@ -388,7 +428,7 @@ void compile(const char **source, const int nLines, const char *lstfile, const c
 				fprintf(out, "%c", tmp[it]);
 			}
 
-			fprintf(lst, "-> JA %x\n", addr);
+			fprintf(lst, "-> JA %08x\n", addr);
 
 			pc += 1 + sizeof(int);
 			free(tmp);
@@ -413,7 +453,7 @@ void compile(const char **source, const int nLines, const char *lstfile, const c
 				fprintf(lst, "%02x ", (unsigned char)tmp[it]);
 				fprintf(out, "%c", tmp[it]);
 			}
-			fprintf(lst, "-> JB %x\n", addr);
+			fprintf(lst, "-> JB %08x\n", addr);
 
 			pc += 1 + sizeof(int);
 			free(tmp);
@@ -438,14 +478,14 @@ void compile(const char **source, const int nLines, const char *lstfile, const c
 				fprintf(lst, "%02x ", (unsigned char)tmp[it]);
 				fprintf(out, "%c", tmp[it]);
 			}
-			fprintf(lst, "-> JE %x\n", addr);
+			fprintf(lst, "-> JE %08x\n", addr);
 
 			pc += 1 + sizeof(int);
 			free(tmp);
 		} else if (isLabel(source[i])) {
 			addLabel(source[i], pc);
 		} else {
-			printf("Unknown command on line %d: %s", i, combuff);
+			printf("Unknown command on line %d: %s\n", i, combuff);
 			error = 1;
 		}
 	}
