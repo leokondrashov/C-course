@@ -169,7 +169,21 @@ void processFile(const char *infile, const char *outfile) {
 			fprintf(out, "JE %d\n", a);
 			ip += 1 + sizeof(int);
 			break;
+		case JNE:
+			a = *((int *) &binaryCode[ip + 1]);
+			fprintf(out, "JNE %d\n", a);
+			ip += 1 + sizeof(int);
+			break;
 
+		case CALL:
+			a = *((int *) &binaryCode[ip + 1]);
+			fprintf(out, "CALL %d\n", a);
+			ip += 1 + sizeof(int);
+			break;
+		case RET:
+			fprintf(out, "RET\n");
+			ip++;
+			break;
 		default:
 			return;
 		}

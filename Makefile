@@ -9,7 +9,7 @@ all:
 
 squareEquation: squareEquation/squareEquation.c
 	$(CC) -o $(BDIR)/squareEquation $(CFLAGS) squareEquation/squareEquation.c -lm
-	
+
 Shakespeare: textProcessor Shakespeare/Shakespeare.c
 	$(CC) -o $(BDIR)/Shakespeare $(CFLAGS) Shakespeare/Shakespeare.c $(ODIR)/textProcessor.o
 
@@ -25,8 +25,11 @@ stack_dbg: stack/stack.c
 stack_utest: stack_dbg stack/unittest.c
 	$(CC) -o $(BDIR)/stack_utest $(CFLAGS) stack/unittest.c $(ODIR)/stack_dbg.o
 
-asm: textProcessor SoftCPU/asm.c
-	$(CC) -o $(BDIR)/asm $(CFLAGS) SoftCPU/asm.c $(ODIR)/textProcessor.o
+map: stack/map.c
+	$(CC) -c -o $(ODIR)/map.o $(CFLAGS) stack/map.c -DNDEBUG
+
+asm: textProcessor SoftCPU/asm.c map
+	$(CC) -o $(BDIR)/asm $(CFLAGS) SoftCPU/asm.c $(ODIR)/textProcessor.o $(ODIR)/map.o
 
 disasm: textProcessor SoftCPU/disasm.c
 	$(CC) -o $(BDIR)/disasm $(CFLAGS) SoftCPU/disasm.c $(ODIR)/textProcessor.o

@@ -9,16 +9,17 @@
 
 enum CPUError {
 	CPU_NO_ERROR,
-	STACK_ERROR,
+	CPU_STACK_ERROR,
 	CPU_ALLOCATION_ERROR,
-	ADDRESS_OUT_OF_MEMORY,
-	UNKNOWN_OPCODE,
-	IP_OUT_OF_PROG,
-	MISSING_PROGRAM
+	CPU_ADDRESS_OUT_OF_MEMORY,
+	CPU_UNKNOWN_OPCODE,
+	CPU_IP_OUT_OF_PROG,
+	CPU_MISSING_PROGRAM
 };
 
 struct CPU {
 	stack st;
+	stack callStack;
 	int *r; //registers
 	int *mem; //ram
 	unsigned int ip; //instuction pointer
@@ -29,16 +30,20 @@ struct CPU {
 
 void CPUCtor(struct CPU *cpu) {
 	assert(cpu);
-
-	cpu->errno = CPU_NO_ERROR;
 	
+	cpu->errno = CPU_NO_ERROR;
+
 //	cpu->st = {};
 	stackCtor(&(cpu->st));
 	if (!stackOk(&(cpu->st)))
-		cpu->errno = STACK_ERROR;
+		cpu->errno = CPU_STACK_ERROR;
 	
-	cpu->r = (int *)calloc(REGISTERS_COUNT, sizeof(int));
-	cpu->mem = (int *)calloc(MEM_SIZE, sizeof(int));
+	stackCtor(&(cpu->callStack));
+	if (!stackOk(&(cpu->callStack)))
+		cpu->errno = CPU_STACK_ERROR;
+	
+	cpu->r = (int *) calloc(REGISTERS_COUNT, sizeof(int));
+	cpu->mem = (int *) calloc(MEM_SIZE, sizeof(int));
 	if (!(cpu->r && cpu->mem))
 		cpu->errno = CPU_ALLOCATION_ERROR;
 	
@@ -51,6 +56,7 @@ void CPUDtor(struct CPU *cpu) {
 	assert(cpu);
 	
 	stackDtor(&(cpu->st));
+	stackDtor(&(cpu->callStack));
 	
 	free(cpu->r);
 	free(cpu->mem);
@@ -70,12 +76,12 @@ int CPUOk(struct CPU *cpu) {
 		return 0;
 	
 	if (!stackOk(&(cpu->st))) {
-		cpu->errno = STACK_ERROR;
+		cpu->errno = CPU_STACK_ERROR;
 		return 0;
 	}
 	
 	if (cpu->ip > cpu->programSize) {
-		cpu->errno = IP_OUT_OF_PROG;
+		cpu->errno = CPU_IP_OUT_OF_PROG;
 		return 0;
 	}
 	
@@ -85,7 +91,11 @@ int CPUOk(struct CPU *cpu) {
 void CPUDump(struct CPU *cpu) {
 	printf("CPU [%p] {\n", cpu);
 	
+	printf("Stack :\n");
 	stackDump(&(cpu->st));
+	
+	printf("Call stack:\n");
+	stackDump(&(cpu->callStack));
 	
 	printf("r[%d]:[%p] {\n", REGISTERS_COUNT, cpu->r);
 	for (int i = 0; i < REGISTERS_COUNT; i++)
@@ -105,7 +115,7 @@ void CPUDump(struct CPU *cpu) {
 	for (unsigned int i = 0; i < cpu->programSize; i += 16) {
 		printf("%08x:", i);
 		for (int j = 0; j < 16 && (i + j < cpu->programSize); j++)
-			printf("%02x ", (unsigned char)cpu->program[i + j]);
+			printf("%02x ", (unsigned char) cpu->program[i + j]);
 		printf("\n");
 	}
 	printf("}\n");
@@ -121,12 +131,12 @@ int CPULoadProgramFromFile(struct CPU *cpu, char *file) {
 	
 	int size = sizeofFile(file);
 	if (size < 0) {
-		cpu->errno = MISSING_PROGRAM;
+		cpu->errno = CPU_MISSING_PROGRAM;
 		return 0;
 	}
 	
 	cpu->programSize = size + 1;
-	cpu->program = (char *)calloc(cpu->programSize, sizeof(char));
+	cpu->program = (char *) calloc(cpu->programSize, sizeof(char));
 	if (cpu->program == NULL) {
 		cpu->errno = CPU_ALLOCATION_ERROR;
 		return 0;
@@ -141,13 +151,13 @@ int CPULoadProgramFromFile(struct CPU *cpu, char *file) {
 int CPURunProgram(struct CPU *cpu) {
 	assert(cpu);
 	
-	if (cpu->program == NULL || !CPUOk(cpu)) 
+	if (cpu->program == NULL || !CPUOk(cpu))
 		return 0;
 	
 	cpu->ip = 0;
 	while (cpu->program[cpu->ip]) {
 		int a = 0, b = 0, addr = 0;
-		switch(cpu->program[cpu->ip]) {
+		switch (cpu->program[cpu->ip]) {
 		case PUSH:
 			a = *((int *) &cpu->program[cpu->ip + 1]);
 			stackPush(&cpu->st, a);
@@ -156,7 +166,7 @@ int CPURunProgram(struct CPU *cpu) {
 		case PUSHR:
 			a = *((int *) &cpu->program[cpu->ip + 1]);
 			if (a >= REGISTERS_COUNT) {
-				cpu->errno = ADDRESS_OUT_OF_MEMORY;
+				cpu->errno = CPU_ADDRESS_OUT_OF_MEMORY;
 				return 0;
 			}
 			stackPush(&cpu->st, cpu->r[a]);
@@ -165,7 +175,7 @@ int CPURunProgram(struct CPU *cpu) {
 		case PUSHMEM:
 			a = *((int *) &cpu->program[cpu->ip + 1]);
 			if (a >= MEM_SIZE) {
-				cpu->errno = ADDRESS_OUT_OF_MEMORY;
+				cpu->errno = CPU_ADDRESS_OUT_OF_MEMORY;
 				return 0;
 			}
 			stackPush(&cpu->st, cpu->mem[a]);
@@ -175,7 +185,7 @@ int CPURunProgram(struct CPU *cpu) {
 		case PUSHINDIR:
 			a = *((int *) &cpu->program[cpu->ip + 1]);
 			if (a >= REGISTERS_COUNT || cpu->r[a] >= MEM_SIZE) {
-				cpu->errno = ADDRESS_OUT_OF_MEMORY;
+				cpu->errno = CPU_ADDRESS_OUT_OF_MEMORY;
 				return 0;
 			}
 			stackPush(&cpu->st, cpu->mem[cpu->r[a]]);
@@ -186,14 +196,14 @@ int CPURunProgram(struct CPU *cpu) {
 			a = *((int *) &cpu->program[cpu->ip + 1]);
 			b = *((int *) &cpu->program[cpu->ip + 1 + sizeof(int)]);
 			if (a >= REGISTERS_COUNT || cpu->r[a] + b >= MEM_SIZE) {
-				cpu->errno = ADDRESS_OUT_OF_MEMORY;
+				cpu->errno = CPU_ADDRESS_OUT_OF_MEMORY;
 				return 0;
 			}
 			stackPush(&cpu->st, cpu->mem[cpu->r[a] + b]);
 			sleep(1);
 			cpu->ip += 1 + 2 * sizeof(int);
 			break;
-
+		
 		case POP:
 			stackPop(&cpu->st);
 			cpu->ip++;
@@ -201,7 +211,7 @@ int CPURunProgram(struct CPU *cpu) {
 		case POPR:
 			a = *((int *) &cpu->program[cpu->ip + 1]);
 			if (a >= REGISTERS_COUNT) {
-				cpu->errno = ADDRESS_OUT_OF_MEMORY;
+				cpu->errno = CPU_ADDRESS_OUT_OF_MEMORY;
 				return 0;
 			}
 			cpu->r[a] = stackPop(&cpu->st);
@@ -210,7 +220,7 @@ int CPURunProgram(struct CPU *cpu) {
 		case POPMEM:
 			a = *((int *) &cpu->program[cpu->ip + 1]);
 			if (a >= MEM_SIZE) {
-				cpu->errno = ADDRESS_OUT_OF_MEMORY;
+				cpu->errno = CPU_ADDRESS_OUT_OF_MEMORY;
 				return 0;
 			}
 			cpu->mem[a] = stackPop(&cpu->st);
@@ -220,7 +230,7 @@ int CPURunProgram(struct CPU *cpu) {
 		case POPINDIR:
 			a = *((int *) &cpu->program[cpu->ip + 1]);
 			if (a >= REGISTERS_COUNT || cpu->r[a] >= MEM_SIZE) {
-				cpu->errno = ADDRESS_OUT_OF_MEMORY;
+				cpu->errno = CPU_ADDRESS_OUT_OF_MEMORY;
 				return 0;
 			}
 			cpu->mem[cpu->r[a]] = stackPop(&cpu->st);
@@ -231,14 +241,14 @@ int CPURunProgram(struct CPU *cpu) {
 			a = *((int *) &cpu->program[cpu->ip + 1]);
 			b = *((int *) &cpu->program[cpu->ip + 1 + sizeof(int)]);
 			if (a >= REGISTERS_COUNT || cpu->r[a] + b >= MEM_SIZE) {
-				cpu->errno = ADDRESS_OUT_OF_MEMORY;
+				cpu->errno = CPU_ADDRESS_OUT_OF_MEMORY;
 				return 0;
 			}
 			cpu->mem[cpu->r[a] + b] = stackPop(&cpu->st);
 			sleep(1);
 			cpu->ip += 1 + 2 * sizeof(int);
 			break;
-
+		
 		case ADD:
 			a = stackPop(&cpu->st);
 			b = stackPop(&cpu->st);
@@ -267,7 +277,7 @@ int CPURunProgram(struct CPU *cpu) {
 			stackPush(&cpu->st, (int) sqrt(stackPop(&cpu->st)));
 			cpu->ip++;
 			break;
-
+		
 		case IN:
 			a = 0;
 			scanf("%d", &a);
@@ -279,11 +289,11 @@ int CPURunProgram(struct CPU *cpu) {
 //			CPUDump(cpu);
 			cpu->ip++;
 			break;
-
+		
 		case JMP:
 			addr = *((int *) &cpu->program[cpu->ip + 1]);
 			if (addr >= cpu->programSize) {
-				cpu->errno = IP_OUT_OF_PROG;
+				cpu->errno = CPU_IP_OUT_OF_PROG;
 				return 0;
 			}
 			cpu->ip = addr;
@@ -291,7 +301,7 @@ int CPURunProgram(struct CPU *cpu) {
 		case JA:
 			addr = *((int *) &cpu->program[cpu->ip + 1]);
 			if (addr >= cpu->programSize) {
-				cpu->errno = IP_OUT_OF_PROG;
+				cpu->errno = CPU_IP_OUT_OF_PROG;
 				return 0;
 			}
 			a = stackPop(&cpu->st);
@@ -304,7 +314,7 @@ int CPURunProgram(struct CPU *cpu) {
 		case JB:
 			addr = *((int *) &cpu->program[cpu->ip + 1]);
 			if (addr >= cpu->programSize) {
-				cpu->errno = IP_OUT_OF_PROG;
+				cpu->errno = CPU_IP_OUT_OF_PROG;
 				return 0;
 			}
 			a = stackPop(&cpu->st);
@@ -317,7 +327,7 @@ int CPURunProgram(struct CPU *cpu) {
 		case JE:
 			addr = *((int *) &cpu->program[cpu->ip + 1]);
 			if (addr >= cpu->programSize) {
-				cpu->errno = IP_OUT_OF_PROG;
+				cpu->errno = CPU_IP_OUT_OF_PROG;
 				return 0;
 			}
 			a = stackPop(&cpu->st);
@@ -327,9 +337,35 @@ int CPURunProgram(struct CPU *cpu) {
 			else
 				cpu->ip += 1 + sizeof(int);
 			break;
-
+		case JNE:
+			addr = *((int *) &cpu->program[cpu->ip + 1]);
+			if (addr >= cpu->programSize) {
+				cpu->errno = CPU_IP_OUT_OF_PROG;
+				return 0;
+			}
+			a = stackPop(&cpu->st);
+			b = stackPop(&cpu->st);
+			if (b != a)
+				cpu->ip = addr;
+			else
+				cpu->ip += 1 + sizeof(int);
+			break;
+			
+		case CALL:
+			addr = *((int *) &cpu->program[cpu->ip + 1]);
+			if (addr >= cpu->programSize) {
+				cpu->errno = CPU_IP_OUT_OF_PROG;
+				return 0;
+			}
+			cpu->ip += 1 + sizeof(int);
+			stackPush(&cpu->callStack, cpu->ip);
+			cpu->ip = addr;
+			break;
+		case RET:
+			cpu->ip = stackPop(&cpu->callStack);
+			break;
 		default:
-			cpu->errno = UNKNOWN_OPCODE;
+			cpu->errno = CPU_UNKNOWN_OPCODE;
 			return 0;
 		}
 	}

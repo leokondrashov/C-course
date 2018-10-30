@@ -93,7 +93,7 @@ void stackSetCapacity(stack *s, int c) {
 	
 	data_t *tmp = realloc(s->data, c * sizeof(data_t));
 	if (tmp == NULL) {
-		s->errno = REALLOCATION_ERROR;
+		s->errno = STACK_REALLOCATION_ERROR;
 	} else {
 		s->capacity = c;
 		s->data = tmp;
@@ -195,6 +195,15 @@ int stackErrno(stack *s) {
 }
 
 /*!
+* \brief set stack's errno to zero
+*/
+void stackResetErrno(stack *s) {
+	assert(s);
+	
+	s->errno = 0;
+}
+
+/*!
 * \brief check if stack s operable
 * \return 0 if stack isn't operable, non-zero otherwise
 */
@@ -202,7 +211,7 @@ int stackErrno(stack *s) {
 int stackOk(stack *s) {
 	assert(s);
 	
-	if (s->errno != 0) return 0;
+	if (s->errno != STACK_NO_ERROR) return 0;
 	
 	return s->data && s->capacity && (s->size <= s->capacity);
 }

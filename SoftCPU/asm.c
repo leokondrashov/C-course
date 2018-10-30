@@ -1,5 +1,6 @@
 #include "CPU.h"
 #include <textProcessor.h>
+#include <map.h>
 #include <string.h>
 #include <assert.h>
 #include <stdio.h>
@@ -7,11 +8,7 @@
 
 #define BUFF_SIZE 100
 
-struct node {
-  struct node *next;
-  char *str;
-  int val;
-} *head = NULL;
+map labels;
 
 int error = 0;
 
@@ -61,27 +58,16 @@ int main(int argc, char *argv[]) {
 	processSource(infile, lstfile, outfile);
 }
 
-
-void freeLabels(struct node *head) {
-	assert(head);
-
-	if (head == NULL)
-		return;
-	freeLabels(head->next);
-	free(head->str);
-	free(head);
-}
-
 void writeLabels(FILE *lst) {
 	assert(lst);
-
-	if (head == NULL)
+	
+	struct m_node *cur = mapBegin(&labels);
+	if (cur == NULL)
 		return;
 	fprintf(lst, "labels:\n");
-	struct node *cur = head;
 	while (cur) {
-		fprintf(lst, "\t%s: %08x\n", cur->str, cur->val);
-		cur = cur->next;
+		fprintf(lst, "\t%s: %08x\n", mNodeKey(cur), mNodeVal(cur));
+		cur = mNodeNext(cur);
 	}
 }
 
@@ -96,6 +82,8 @@ void processSource(const char *infile, const char *lstfile, const char *outfile)
 		exit(1);
 	}
 	int nLines = countLines(source);
+	
+	mapCtor(&labels);
 
 	compile(source, nLines, lstfile, outfile);
 	if (!error)
@@ -106,9 +94,7 @@ void processSource(const char *infile, const char *lstfile, const char *outfile)
 		remove(outfile);
 	}
 
-	freeLabels(head);
-	free(source[0]);
-	free(source);
+	mapDtor(&labels);
 }
 
 int isLabel(const char *line) {
@@ -122,48 +108,24 @@ int isLabel(const char *line) {
 
 int getLabelAddress(const char *line) {
 	assert(line);
-
-	if (head == NULL)
+	
+	mapResetErrno(&labels);
+	int addr = mapGet(&labels, line);
+	if (mapErrno(&labels) != 0)
 		return -1;
-	for (struct node *cur = head; cur; cur = cur->next) {
-		if (strcasecmp(line, cur->str) == 0)
-			return cur->val;
-	}
-	return -1;
+	return addr;
 }
 
 void addLabel(char *line, int val) {
 	assert(line);
-
+	
 	char *str = (char *)calloc(10, sizeof(char));
 	sscanf(line, "%[a-zA-Z_0-9]%*[:]", str);
-	if (head == NULL) {
-		head = (struct node *)calloc(1, sizeof(struct node));
-		head->next = NULL;
-		head->val = val;
-		head->str = str;
-		return;
-	}
-
-	struct node *cur = head;
-	while (cur->next) {
-		if (strcasecmp(cur->str, str) == 0) {
-			free(str);
-			return;
-		}
-		cur = cur->next;
-	}
-	if (strcasecmp(cur->str, str) == 0) {
-		free(str);
-		return;
-	}
-	cur->next = (struct node *)calloc(1, sizeof(struct node));
-	cur->next->next = NULL;
-	cur->next->val = val;
-	cur->next->str = str;
+	mapAdd(&labels, str, val);
+	free(str);
 }
 
-void compile(const char **source, const int nLines, const char *lstfile, const char *outfile) {
+void compile(const char **source, int nLines, const char *lstfile, const char *outfile) {
 	assert(source);
 	assert(lstfile);
 	assert(outfile);
@@ -518,8 +480,62 @@ void compile(const char **source, const int nLines, const char *lstfile, const c
 
 			pc += 1 + sizeof(int);
 			free(tmp);
+		} else if (strcasecmp(combuff, "jne") == 0) {
+			if (strlen(argbuff) == 0) {
+				printf("missing argument on line %d\n", i);
+				error = 1;
+				continue;
+			}
+
+			int addr = 0;
+			if (!sscanf(argbuff, "%d", &addr)) { // if nothing converted
+				addr = getLabelAddress(argbuff);
+			}
+			char *tmp = (char *)calloc(sizeof(int) + 1, sizeof(char));
+			*((int *)tmp) = addr; // writing addr in binary
+			tmp[sizeof(int)] = '\0';
+
+			fprintf(out, "%c", (char)JNE);
+			fprintf(lst, "%08x: %02x ", pc, JNE);
+			for (int it = 0; it < sizeof(int); it++) {
+				fprintf(lst, "%02x ", (unsigned char)tmp[it]);
+				fprintf(out, "%c", tmp[it]);
+			}
+			fprintf(lst, "-> JNE %08x\n", addr);
+
+			pc += 1 + sizeof(int);
+			free(tmp);
+		} else if (strcasecmp(combuff, "call") == 0) {
+			if (strlen(argbuff) == 0) {
+				printf("missing argument on line %d\n", i);
+				error = 1;
+				continue;
+			}
+
+			int addr = 0;
+			if (!sscanf(argbuff, "%d", &addr)) { // if nothing converted
+				addr = getLabelAddress(argbuff);
+			}
+			char *tmp = (char *)calloc(sizeof(int) + 1, sizeof(char));
+			*((int *)tmp) = addr; // writing addr in binary
+			tmp[sizeof(int)] = '\0';
+
+			fprintf(out, "%c", (char)CALL);
+			fprintf(lst, "%08x: %02x ", pc, CALL);
+			for (int it = 0; it < sizeof(int); it++) {
+				fprintf(lst, "%02x ", (unsigned char)tmp[it]);
+				fprintf(out, "%c", tmp[it]);
+			}
+			fprintf(lst, "-> CALL %08x\n", addr);
+
+			pc += 1 + sizeof(int);
+			free(tmp);
+		} else if (strcasecmp(combuff, "ret") == 0) {
+			fprintf(out, "%c", (char)RET);
+			fprintf(lst, "%08x: %02x -> RET\n", pc, RET);
+			pc++;
 		} else if (isLabel(source[i])) {
-			addLabel(source[i], pc);
+				addLabel(source[i], pc);
 		} else {
 			printf("Unknown command on line %d: %s\n", i, combuff);
 			error = 1;

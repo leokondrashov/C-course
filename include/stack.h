@@ -13,7 +13,7 @@ typedef struct stack stack;
 enum stackError {
 	STACK_NO_ERROR,
 	STACK_ALLOCATION_ERROR,
-	REALLOCATION_ERROR,
+	STACK_REALLOCATION_ERROR,
 	STACK_UNDERFLOW,
 };
 
@@ -38,6 +38,7 @@ data_t stackPop(stack *s);
 unsigned int stackSize(stack *s);
 unsigned int stackCapacity(stack *s);
 int stackErrno(stack *s);
+void stackResetErrno(stack *s);
 
 void stackClear(stack *s);
 
