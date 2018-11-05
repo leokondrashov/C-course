@@ -14,6 +14,10 @@ int main() {
 	mapDtor(&m);
 }*/
 
+/*!
+ * @brief constructor of struct map
+ * @param m
+ */
 void mapCtor(map *m) {
 	assert(m);
 	
@@ -22,6 +26,10 @@ void mapCtor(map *m) {
 	m->errno = MAP_NO_ERROR;
 }
 
+/*!
+ * @brief destructor of strust map
+ * @param m
+ */
 void mapDtor(map *m) {
 	assert(m);
 	
@@ -32,6 +40,10 @@ void mapDtor(map *m) {
 	m->errno = MAP_NO_ERROR;
 }
 
+/*!
+ * @brief recursively frees nodes starting with node till the NULL pointer to next node
+ * @param node
+ */
 void freeNodes(struct m_node *node) {
 	if (node == NULL)
 		return;
@@ -40,27 +52,46 @@ void freeNodes(struct m_node *node) {
 	mNodeDtor(node);
 }
 
+/*!
+ * @brief checks if m is operable
+ * @param m
+ * @return 1 if map is operable, 0 otherwise
+ */
 int mapOk(map *m) {
-	assert(m);
+	if (m == NULL)
+		return 0;
 	
-	if (m->errno != MAP_NO_ERROR) return 0;
+	if (m->errno != MAP_NO_ERROR)
+		return 0;
+	
 	return 1;
 }
 
+/*!
+ * @brief debug info for map m
+ * @param m
+ */
 void mapDump(map *m) {
 	assert(m);
 	
 	printf("map [%p] {\n", m);
+	printf("\terrno = %d\n", m->errno);
 	printf("\tsize = %d\n", m->size);
 	printf("\tnodes:\n");
 	for (struct m_node *cur = m->head; cur != NULL; cur = cur->next) {
 		printf("\t\t\"%s\" -> %d [%p]\n", cur->key, cur->val, cur);
 	}
-	printf("\terrno = %d\n", m->errno);
 	printf("}\n");
 }
 
-int mapAdd(map *m, char *key, int val) {
+/*!
+ * @brief adds new node with key, val pair
+ * @param m
+ * @param key
+ * @param val
+ * @return 0 if error occured, 1 if addition completed, 2 if node with key is existing
+ */
+int mapAdd(map *m, const char *key, int val) {
 	assert(m);
 	assert(key);
 	
@@ -95,7 +126,14 @@ int mapAdd(map *m, char *key, int val) {
 	return 1;
 }
 
-int mapGet(map *m, char *key) {
+/*!
+ * @brief gets val by key
+ * @param m
+ * @param key
+ * @return val of node with key or 0 if no such node present
+ * @note if there is no such node errno is set to MAP_NO_SUCH_ELEMENT
+ */
+int mapGet(map *m, const char *key) {
 	assert(m);
 	assert(key);
 	
@@ -114,7 +152,13 @@ int mapGet(map *m, char *key) {
 	return 0;
 }
 
-int mapRemove(map *m, char *key) {
+/*!
+ * @brief removes node with key
+ * @param m
+ * @param key
+ * @return 0 if no such node present, 1 if deletion successful
+ */
+int mapRemove(map *m, const char *key) {
 	assert(m);
 	assert(key);
 	
@@ -143,7 +187,13 @@ int mapRemove(map *m, char *key) {
 	return 0;
 }
 
-int mapFind(map *m, char *key) {
+/*!
+ * @brief checks if node with key exists
+ * @param m
+ * @param key
+ * @return 1 if such node found, 0 otherwise
+ */
+int mapFind(map *m, const char *key) {
 	assert(m);
 	assert(key);
 	
@@ -159,37 +209,67 @@ int mapFind(map *m, char *key) {
 	return 0;
 }
 
+/*!
+ *
+ * @param m
+ * @return size of m
+ */
 unsigned int mapSize(map *m) {
 	assert(m);
 	
 	return m->size;
 }
 
+/*!
+ *
+ * @param m
+ * @return errno of m
+ */
 int mapErrno(map *m) {
 	assert(m);
 	
 	return m->errno;
 }
 
+/*!
+ * @brief resets errno of m to 0
+ * @param m
+ */
 void mapResetErrno(map *m) {
 	assert(m);
 	
 	m->errno = 0;
 }
 
+/*!
+ *
+ * @param m
+ * @return pointer to head node
+ */
 struct m_node *mapBegin(map *m) {
 	assert(m);
 	
 	return m->head;
 }
 
+/*!
+ *
+ * @param m
+ * @return pointer to next node from last node of list
+ */
 struct m_node *mapEnd(map *m) {
 	assert(m);
 	
 	return NULL;
 }
 
-void mNodeCtor(struct m_node *node, char *key, int val) {
+/*!
+ * @brief constructor of struct m_node
+ * @param node
+ * @param key
+ * @param val
+ */
+void mNodeCtor(struct m_node *node, const char *key, int val) {
 	assert(node);
 	assert(key);
 	
@@ -202,6 +282,12 @@ void mNodeCtor(struct m_node *node, char *key, int val) {
 	node->val = val;
 }
 
+/*!
+ * @brief destructor of struct m_node
+ * @param node
+ * @param key
+ * @param val
+ */
 void mNodeDtor(struct m_node *node) {
 	assert(node);
 	
@@ -212,18 +298,33 @@ void mNodeDtor(struct m_node *node) {
 	node->val = 0;
 }
 
+/*!
+ *
+ * @param node
+ * @return pointer to the next node
+ */
 struct m_node *mNodeNext(struct m_node *node) {
 	assert(node);
 		
 	return node->next;
 }
 
+/*!
+ *
+ * @param node
+ * @return key of current node
+ */
 char *mNodeKey(struct m_node *node) {
 	assert(node);
 		
 	return node->key;
 }
 
+/*!
+ *
+ * @param node
+ * @return val of current node
+ */
 int mNodeVal(struct m_node *node) {
 	assert(node);
 		

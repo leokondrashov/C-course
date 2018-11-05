@@ -209,11 +209,15 @@ void stackResetErrno(stack *s) {
 */
 
 int stackOk(stack *s) {
-	assert(s);
+	if (s == NULL)
+		return 0;
 	
 	if (s->errno != STACK_NO_ERROR) return 0;
 	
-	return s->data && s->capacity && (s->size <= s->capacity);
+	if (s->data == NULL || s->capacity == 0 || s->size <= s->capacity)
+		return 0;
+	
+	return 1;
 }
 
 /*!

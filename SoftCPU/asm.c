@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define BUFF_SIZE 100
+#define MAX_LABEL_SIZE 16
 
 map labels;
 
@@ -58,6 +58,10 @@ int main(int argc, char *argv[]) {
 	processSource(infile, lstfile, outfile);
 }
 
+/*!
+ * @brief write labels to listing file lst
+ * @param lst
+ */
 void writeLabels(FILE *lst) {
 	assert(lst);
 	
@@ -71,6 +75,57 @@ void writeLabels(FILE *lst) {
 	}
 }
 
+/*!
+ *
+ * @param line
+ * @return 1 if line contains label in right format, 0 otherwise
+ */
+int isLabel(const char *line) {
+	assert(line);
+	
+	char *tmp = (char *)calloc(MAX_LABEL_SIZE, sizeof(char));
+	int val = sscanf(line, "%[a-zA-Z_0-9]%[:]", tmp, tmp);
+	free(tmp);
+	return val == 2;
+}
+
+/*!
+ *
+ * @param line
+ * @return address of this label, -1 if no such label present
+ */
+int getLabelAddress(const char *line) {
+	assert(line);
+	
+	mapResetErrno(&labels);
+	int addr = mapGet(&labels, line);
+	if (mapErrno(&labels) != 0) {
+		mapResetErrno(&labels);
+		return -1;
+	}
+	return addr;
+}
+
+/*!
+ * @brief adds label to labels
+ * @param line name of label
+ * @param val address of label line
+ */
+void addLabel(const char *line, int val) {
+	assert(line);
+	
+	char *str = (char *)calloc(MAX_LABEL_SIZE, sizeof(char));
+	sscanf(line, "%[a-zA-Z_0-9]%*[:]", str);
+	mapAdd(&labels, str, val);
+	free(str);
+}
+
+/*!
+ * @brief process file infile, writing listing to lstfile, binary to outfile
+ * @param infile
+ * @param lstfile
+ * @param outfile
+ */
 void processSource(const char *infile, const char *lstfile, const char *outfile) {
 	assert(infile);
 	assert(lstfile);
@@ -97,34 +152,83 @@ void processSource(const char *infile, const char *lstfile, const char *outfile)
 	mapDtor(&labels);
 }
 
-int isLabel(const char *line) {
-	assert(line);
-
-	char *tmp = (char *)calloc(1, sizeof(char));
-	int val = sscanf(line, "%[a-zA-Z_0-9]%[:]", tmp, tmp);
-	free(tmp);
-	return val == 2;
-}
-
-int getLabelAddress(const char *line) {
-	assert(line);
+/*!
+ * @brief parse arguments from line
+ * @param [in] args
+ * @param [out] argv
+ * @param [in] maxArgc
+ * @return number of parsed arguments
+ */
+int getArgs(const char *args, int *argv, int maxArgc) {
+	assert(args);
+	assert(argv);
 	
-	mapResetErrno(&labels);
-	int addr = mapGet(&labels, line);
-	if (mapErrno(&labels) != 0)
-		return -1;
-	return addr;
-}
-
-void addLabel(char *line, int val) {
-	assert(line);
+	int argc = 0, nextPos = 0, arg = 0;
+	char *label = (char *)calloc(MAX_LABEL_SIZE, sizeof(char));
 	
-	char *str = (char *)calloc(10, sizeof(char));
-	sscanf(line, "%[a-zA-Z_0-9]%*[:]", str);
-	mapAdd(&labels, str, val);
-	free(str);
+	do {
+		nextPos = 0;
+		if (sscanf(args, "%d%n", &arg, &nextPos) && nextPos != 0) {
+			if (argc < maxArgc)
+				argv[argc] = arg;
+			argc++;
+		} else if (sscanf(args, " r%d%n", &arg, &nextPos) && nextPos != 0) {
+			if (argc < maxArgc)
+				argv[argc] = arg;
+			argc++;
+		} else if (sscanf(args, " %[a-zA-Z_0-9]%n", label, &nextPos) && nextPos != 0) {
+			if (argc < maxArgc)
+				argv[argc] = getLabelAddress(label);
+			argc++;
+		}
+		
+		args += nextPos;
+	} while (nextPos != 0 && args[0] != ';' && args[0] != '\0');
+	
+	return argc;
 }
 
+/*!
+ * @brief writes argc arguments from argv in binary form to outfile and lstfile
+ * @param argc
+ * @param argv
+ * @param lstfile listing file
+ * @param outfile binary file
+ */
+void writeBinArgs(int argc, int *argv, FILE *lstfile, FILE *outfile) {
+	assert(argv);
+	assert(lstfile);
+	assert(outfile);
+	
+	char *chars = (char *)argv;
+	for (int i = 0; i < argc * sizeof(int); i++) {
+		fprintf(lstfile, "%02x ", (unsigned char)chars[i]);
+		fprintf(outfile, "%c", chars[i]);
+	}
+}
+
+/*!
+ * @brief writes argc arguments from argv in hexadecimal form to and lstfile
+ * @param argc
+ * @param argv
+ * @param lstfile listing file
+ */
+void writeHexArgs(int argc, int *argv, FILE *lstfile) {
+	assert(argv);
+	assert(lstfile);
+	
+	for (int i = 0; i < argc; i++) {
+		fprintf(lstfile, "%x ", argv[i]);
+	}
+}
+
+/*!
+ * @brief compiles lines from source to listing file lstfile and binary file outfile
+ * @param source
+ * @param nLines
+ * @param lstfile
+ * @param outfile
+ */
 void compile(const char **source, int nLines, const char *lstfile, const char *outfile) {
 	assert(source);
 	assert(lstfile);
@@ -133,408 +237,48 @@ void compile(const char **source, int nLines, const char *lstfile, const char *o
 	int pc = 0; // program counter
 	FILE *lst = fopen(lstfile, "wb");
 	FILE *out = fopen(outfile, "wb");
-	char *combuff = (char *)calloc(5, sizeof(char)), *argbuff = (char *)calloc(100, sizeof(char));
+	
+	int maxCmdLen = 0, len = 0;
+	int maxArgc = 0;
+	
+	#define DEF_CMD(name, code, argc, instr) \
+	len = strlen(#name); \
+	if (len > maxCmdLen) \
+		maxCmdLen = len; \
+	if (argc > maxArgc) \
+		maxArgc = argc;
+	#include "commands.h"
+	#undef DEF_CMD
+	
+	char *combuff = (char *)calloc(maxCmdLen, sizeof(char));
+	int *argbuff = (int *)calloc(maxArgc, sizeof(int));
+	int argsPos = 0;
 
 	for (int i = 0; i < nLines; i++) {
 		combuff[0] = '\0';
-		argbuff[0] = '\0';
-		sscanf(source[i], "%s %[^;]", combuff, argbuff);
-		if (strlen(source[i]) == 0)
+		
+		sscanf(source[i], "%[^;\n ]%n", combuff, &argsPos);
+		if (strlen(source[i]) == 0 || strlen(combuff) == 0)
 			continue;
-		if (strcasecmp(combuff, "end") == 0) {
-			fprintf(out, "%c", (char)END);
-			fprintf(lst, "%08x: %02x -> END\n", pc, END);
-			pc++;
-		} else if (strcasecmp(combuff, "push") == 0) {
-			if (strlen(argbuff) == 0) {
-				printf("missing argument on line %d\n", i);
-				error = 1;
-				continue;
-			}
-
-			int arg1 = 0, arg2 = 0;
-			char *tmp = NULL;
-			switch (sscanf(argbuff, "[r%d + %d]", &arg1, &arg2)) {
-			case 2:
-				fprintf(out, "%c", (char)PUSHINDIROFFSET);
-				fprintf(lst, "%08x: %02x ", pc, PUSHINDIROFFSET);
-
-				tmp = (char *)calloc(sizeof(int) + 1, sizeof(char));
-
-				*((int *)tmp) = arg1;
-				tmp[sizeof(int)] = '\0';
-				for (int it = 0; it < sizeof(int); it++) {
-					fprintf(lst, "%02x ", (unsigned char)tmp[it]);
-					fprintf(out, "%c", tmp[it]);
-				}
-
-				*((int *)tmp) = arg2;
-				tmp[sizeof(int)] = '\0';
-				for (int it = 0; it < sizeof(int); it++) {
-					fprintf(lst, "%02x ", (unsigned char)tmp[it]);
-					fprintf(out, "%c", tmp[it]);
-				}
-
-				free(tmp);
-
-				fprintf(lst, "-> PUSH [r%d+%d]\n", arg1, arg2);
-				pc += 1 + 2 * sizeof(int);
-				break;
-			case 1:
-				fprintf(out, "%c", (char)PUSHINDIR);
-				fprintf(lst, "%08x: %02x ", pc, PUSHINDIR);
-
-				tmp = (char *)calloc(sizeof(int) + 1, sizeof(char));
-
-				*((int *)tmp) = arg1;
-				tmp[sizeof(int)] = '\0';
-				for (int it = 0; it < sizeof(int); it++) {
-					fprintf(lst, "%02x ", (unsigned char)tmp[it]);
-					fprintf(out, "%c", tmp[it]);
-				}
-
-				free(tmp);
-
-				fprintf(lst, "-> PUSH [r%d]\n", arg1);
-				pc += 1 + sizeof(int);
-				break;
-			case 0:
-			default:
-				if (sscanf(argbuff, "r%d", &arg1)) {
-					fprintf(out, "%c", (char)PUSHR);
-					fprintf(lst, "%08x: %02x ", pc, PUSHR);
-
-					tmp = (char *)calloc(sizeof(int) + 1, sizeof(char));
-
-					*((int *)tmp) = arg1;
-					tmp[sizeof(int)] = '\0';
-					for (int it = 0; it < sizeof(int); it++) {
-						fprintf(lst, "%02x ", (unsigned char)tmp[it]);
-						fprintf(out, "%c", tmp[it]);
-					}
-
-					free(tmp);
-
-					fprintf(lst, "-> PUSH r%d\n", arg1);
-					pc += 1 + sizeof(int);
-				} else if (sscanf(argbuff, "[%d]", &arg1)) {
-					fprintf(out, "%c", (char)PUSHMEM);
-					fprintf(lst, "%08x: %02x ", pc, PUSHMEM);
-
-					tmp = (char *)calloc(sizeof(int) + 1, sizeof(char));
-
-					*((int *)tmp) = arg1;
-					tmp[sizeof(int)] = '\0';
-					for (int it = 0; it < sizeof(int); it++) {
-						fprintf(lst, "%02x ", (unsigned char)tmp[it]);
-						fprintf(out, "%c", tmp[it]);
-					}
-
-					free(tmp);
-
-					fprintf(lst, "-> PUSH [%d]\n", arg1);
-					pc += 1 + sizeof(int);
-				} else if (sscanf(argbuff, "%d", &arg1)) {
-					fprintf(out, "%c", (char)PUSH);
-					fprintf(lst, "%08x: %02x ", pc, PUSH);
-
-					tmp = (char *)calloc(sizeof(int) + 1, sizeof(char));
-
-					*((int *)tmp) = arg1;
-					tmp[sizeof(int)] = '\0';
-					for (int it = 0; it < sizeof(int); it++) {
-						fprintf(lst, "%02x ", (unsigned char)tmp[it]);
-						fprintf(out, "%c", tmp[it]);
-					}
-
-					free(tmp);
-
-					fprintf(lst, "-> PUSH %d\n", arg1);
-					pc += 1 + sizeof(int);
-				} else {
-					printf("Unknown args on line %d\n", i);
-					error = 1;
-				}
-			}
-		} else if (strcasecmp(combuff, "pop") == 0) {
-			if (strlen(argbuff) == 0) {
-				fprintf(out, "%c", (char)POP);
-				fprintf(lst, "%08x: %02x -> POP\n", pc, POP);
-				pc++;
-				continue;
-			}
-
-			int arg1 = 0, arg2 = 0;
-			char *tmp = NULL;
-			switch (sscanf(argbuff, "[r%d + %d]", &arg1, &arg2)) {
-			case 2:
-				fprintf(out, "%c", (char)POPINDIROFFSET);
-				fprintf(lst, "%08x: %02x ", pc, POPINDIROFFSET);
-
-				tmp = (char *)calloc(sizeof(int) + 1, sizeof(char));
-
-				*((int *)tmp) = arg1;
-				tmp[sizeof(int)] = '\0';
-				for (int it = 0; it < sizeof(int); it++) {
-					fprintf(lst, "%02x ", (unsigned char)tmp[it]);
-					fprintf(out, "%c", tmp[it]);
-				}
-
-				*((int *)tmp) = arg2;
-				tmp[sizeof(int)] = '\0';
-				for (int it = 0; it < sizeof(int); it++) {
-					fprintf(lst, "%02x ", (unsigned char)tmp[it]);
-					fprintf(out, "%c", tmp[it]);
-				}
-
-				free(tmp);
-
-				fprintf(lst, "-> POP [r%d+%d]\n", arg1, arg2);
-				pc += 1 + 2 * sizeof(int);
-				break;
-			case 1:
-				fprintf(out, "%c", (char)POPINDIR);
-				fprintf(lst, "%08x: %02x ", pc, POPINDIR);
-
-				tmp = (char *)calloc(sizeof(int) + 1, sizeof(char));
-
-				*((int *)tmp) = arg1;
-				tmp[sizeof(int)] = '\0';
-				for (int it = 0; it < sizeof(int); it++) {
-					fprintf(lst, "%02x ", (unsigned char)tmp[it]);
-					fprintf(out, "%c", tmp[it]);
-				}
-
-				free(tmp);
-
-				fprintf(lst, "-> POP [r%d]\n", arg1);
-				pc += 1 + sizeof(int);
-				break;
-			case 0:
-			default:
-				if (sscanf(argbuff, "r%d", &arg1)) {
-					fprintf(out, "%c", (char)POPR);
-					fprintf(lst, "%08x: %02x ", pc, POPR);
-
-					tmp = (char *)calloc(sizeof(int) + 1, sizeof(char));
-
-					*((int *)tmp) = arg1;
-					tmp[sizeof(int)] = '\0';
-					for (int it = 0; it < sizeof(int); it++) {
-						fprintf(lst, "%02x ", (unsigned char)tmp[it]);
-						fprintf(out, "%c", tmp[it]);
-					}
-
-					free(tmp);
-
-					fprintf(lst, "-> POP r%d\n", arg1);
-					pc += 1 + sizeof(int);
-				} else if (sscanf(argbuff, "[%d]", &arg1)) {
-					fprintf(out, "%c", (char)POPMEM);
-					fprintf(lst, "%08x: %02x ", pc, POPMEM);
-
-					tmp = (char *)calloc(sizeof(int) + 1, sizeof(char));
-
-					*((int *)tmp) = arg1;
-					tmp[sizeof(int)] = '\0';
-					for (int it = 0; it < sizeof(int); it++) {
-						fprintf(lst, "%02x ", (unsigned char)tmp[it]);
-						fprintf(out, "%c", tmp[it]);
-					}
-
-					free(tmp);
-
-					fprintf(lst, "-> POP [%d]\n", arg1);
-					pc += 1 + sizeof(int);
-				} else {
-					printf("Unknown args on line %d\n", i);
-					error = 1;
-				}
-			}
-		} else if (strcasecmp(combuff, "add") == 0) {
-			fprintf(out, "%c", (char)ADD);
-			fprintf(lst, "%08x: %02x -> ADD\n", pc, ADD);
-			pc++;
-		} else if (strcasecmp(combuff, "sub") == 0) {
-			fprintf(out, "%c", (char)SUB);
-			fprintf(lst, "%08x: %02x -> SUB\n", pc, SUB);
-			pc++;
-		} else if (strcasecmp(combuff, "mul") == 0) {
-			fprintf(out, "%c", (char)MUL);
-			fprintf(lst, "%08x: %02x -> MUL\n", pc, MUL);
-			pc++;
-		} else if (strcasecmp(combuff, "div") == 0) {
-			fprintf(out, "%c", (char)DIV);
-			fprintf(lst, "%08x: %02x -> DIV\n", pc, DIV);
-			pc++;
-		} else if (strcasecmp(combuff, "sqrt") == 0) {
-			fprintf(out, "%c", (char)SQRT);
-			fprintf(lst, "%08x: %02x -> SQRT\n", pc, SQRT);
-			pc++;
-		} else if (strcasecmp(combuff, "in") == 0) {
-			fprintf(out, "%c", (char)IN);
-			fprintf(lst, "%08x: %02x -> IN\n", pc, IN);
-			pc++;
-		} else if (strcasecmp(combuff, "out") == 0) {
-			fprintf(out, "%c", (char)OUT);
-			fprintf(lst, "%08x: %02x -> OUT\n", pc, OUT);
-			pc++;
-		} else if (strcasecmp(combuff, "jmp") == 0) {
-			if (strlen(argbuff) == 0) {
-				printf("missing argument on line %d\n", i);
-				error = 1;
-				continue;
-			}
-
-			int addr = 0;
-			if (!sscanf(argbuff, "%d", &addr)) { // if nothing converted
-				addr = getLabelAddress(argbuff);
-			}
-			char *tmp = (char *)calloc(sizeof(int) + 1, sizeof(char));
-			*((int *)tmp) = addr; // writing addr in binary
-			tmp[sizeof(int)] = '\0';
-
-			fprintf(out, "%c", (char)JMP);
-			fprintf(lst, "%08x: %02x ", pc, JMP);
-			for (int it = 0; it < sizeof(int); it++) {
-				fprintf(lst, "%02x ", (unsigned char)tmp[it]);
-				fprintf(out, "%c", tmp[it]);
-			}
-			fprintf(lst, "-> JMP %08x\n", addr);
-
-			pc += 1 + sizeof(int);
-			free(tmp);
-		} else if (strcasecmp(combuff, "ja") == 0) {
-			if (strlen(argbuff) == 0) {
-				printf("missing argument on line %d\n", i);
-				error = 1;
-				continue;
-			}
-
-			int addr = 0;
-			if (!sscanf(argbuff, "%d", &addr)) { // if nothing converted
-				addr = getLabelAddress(argbuff);
-			}
-			char *tmp = (char *)calloc(sizeof(int) + 1, sizeof(char));
-			*((int *)tmp) = addr; // writing addr in binary
-			tmp[sizeof(int)] = '\0';
-
-			fprintf(out, "%c", (char)JA);
-			fprintf(lst, "%08x: %02x ", pc, JA);
-			for (int it = 0; it < sizeof(int); it++) {
-				fprintf(lst, "%02x ", (unsigned char)tmp[it]);
-				fprintf(out, "%c", tmp[it]);
-			}
-
-			fprintf(lst, "-> JA %08x\n", addr);
-
-			pc += 1 + sizeof(int);
-			free(tmp);
-		} else if (strcasecmp(combuff, "jb") == 0) {
-			if (strlen(argbuff) == 0) {
-				printf("missing argument on line %d\n", i);
-				error = 1;
-				continue;
-			}
-
-			int addr = 0;
-			if (!sscanf(argbuff, "%d", &addr)) { // if nothing converted
-				addr = getLabelAddress(argbuff);
-			}
-			char *tmp = (char *)calloc(sizeof(int) + 1, sizeof(char));
-			*((int *)tmp) = addr; // writing addr in binary
-			tmp[sizeof(int)] = '\0';
-
-			fprintf(out, "%c", (char)JB);
-			fprintf(lst, "%08x: %02x ", pc, JB);
-			for (int it = 0; it < sizeof(int); it++) {
-				fprintf(lst, "%02x ", (unsigned char)tmp[it]);
-				fprintf(out, "%c", tmp[it]);
-			}
-			fprintf(lst, "-> JB %08x\n", addr);
-
-			pc += 1 + sizeof(int);
-			free(tmp);
-		} else if (strcasecmp(combuff, "je") == 0) {
-			if (strlen(argbuff) == 0) {
-				printf("missing argument on line %d\n", i);
-				error = 1;
-				continue;
-			}
-
-			int addr = 0;
-			if (!sscanf(argbuff, "%d", &addr)) { // if nothing converted
-				addr = getLabelAddress(argbuff);
-			}
-			char *tmp = (char *)calloc(sizeof(int) + 1, sizeof(char));
-			*((int *)tmp) = addr; // writing addr in binary
-			tmp[sizeof(int)] = '\0';
-
-			fprintf(out, "%c", (char)JE);
-			fprintf(lst, "%08x: %02x ", pc, JE);
-			for (int it = 0; it < sizeof(int); it++) {
-				fprintf(lst, "%02x ", (unsigned char)tmp[it]);
-				fprintf(out, "%c", tmp[it]);
-			}
-			fprintf(lst, "-> JE %08x\n", addr);
-
-			pc += 1 + sizeof(int);
-			free(tmp);
-		} else if (strcasecmp(combuff, "jne") == 0) {
-			if (strlen(argbuff) == 0) {
-				printf("missing argument on line %d\n", i);
-				error = 1;
-				continue;
-			}
-
-			int addr = 0;
-			if (!sscanf(argbuff, "%d", &addr)) { // if nothing converted
-				addr = getLabelAddress(argbuff);
-			}
-			char *tmp = (char *)calloc(sizeof(int) + 1, sizeof(char));
-			*((int *)tmp) = addr; // writing addr in binary
-			tmp[sizeof(int)] = '\0';
-
-			fprintf(out, "%c", (char)JNE);
-			fprintf(lst, "%08x: %02x ", pc, JNE);
-			for (int it = 0; it < sizeof(int); it++) {
-				fprintf(lst, "%02x ", (unsigned char)tmp[it]);
-				fprintf(out, "%c", tmp[it]);
-			}
-			fprintf(lst, "-> JNE %08x\n", addr);
-
-			pc += 1 + sizeof(int);
-			free(tmp);
-		} else if (strcasecmp(combuff, "call") == 0) {
-			if (strlen(argbuff) == 0) {
-				printf("missing argument on line %d\n", i);
-				error = 1;
-				continue;
-			}
-
-			int addr = 0;
-			if (!sscanf(argbuff, "%d", &addr)) { // if nothing converted
-				addr = getLabelAddress(argbuff);
-			}
-			char *tmp = (char *)calloc(sizeof(int) + 1, sizeof(char));
-			*((int *)tmp) = addr; // writing addr in binary
-			tmp[sizeof(int)] = '\0';
-
-			fprintf(out, "%c", (char)CALL);
-			fprintf(lst, "%08x: %02x ", pc, CALL);
-			for (int it = 0; it < sizeof(int); it++) {
-				fprintf(lst, "%02x ", (unsigned char)tmp[it]);
-				fprintf(out, "%c", tmp[it]);
-			}
-			fprintf(lst, "-> CALL %08x\n", addr);
-
-			pc += 1 + sizeof(int);
-			free(tmp);
-		} else if (strcasecmp(combuff, "ret") == 0) {
-			fprintf(out, "%c", (char)RET);
-			fprintf(lst, "%08x: %02x -> RET\n", pc, RET);
-			pc++;
-		} else if (isLabel(source[i])) {
+		
+		#define DEF_CMD(name, code, argc, instr) \
+		if (strcasecmp(combuff, #name) == 0) { \
+			if (getArgs(source[i] + argsPos, argbuff, maxArgc) != (argc)) { \
+				error = 1; \
+				printf("Wrong arguments count on line %d: expected %d arguments, got %d\n", i + 1, argc, getArgs(source[i] + argsPos, argbuff, maxArgc)); \
+			} \
+			fprintf(out, "%c", (char)(code)); \
+			fprintf(lst, "%08x: %02x ", pc, CMD_##name); \
+			writeBinArgs((argc), argbuff, lst, out); \
+			fprintf(lst, "-> %s ", #name); \
+			writeHexArgs((argc), argbuff, lst); \
+			fprintf(lst, "\n"); \
+			pc += 1 + (argc) * sizeof(int); \
+		} else
+		#include "commands.h"
+		#undef DEF_CMD
+		
+		if (isLabel(source[i])) {
 				addLabel(source[i], pc);
 		} else {
 			printf("Unknown command on line %d: %s\n", i, combuff);

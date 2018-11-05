@@ -29,10 +29,10 @@ int mapOk(map *m);
 
 void mapDump(map *m);
 
-int mapAdd(map *m, char *key, int val);
-int mapGet(map *m, char *key);
-int mapRemove(map *m, char *key);
-int mapFind(map *m, char *key);
+int mapAdd(map *m, const char *key, int val);
+int mapGet(map *m, const char *key);
+int mapRemove(map *m, const char *key);
+int mapFind(map *m, const char *key);
 
 unsigned int mapSize(map *m);
 int mapErrno(map *m);
@@ -41,7 +41,7 @@ void mapResetErrno(map *m);
 struct m_node *mapBegin(map *m);
 struct m_node *mapEnd(map *m);
 
-void mNodeCtor(struct m_node *node, char *key, int val);
+void mNodeCtor(struct m_node *node, const char *key, int val);
 void mNodeDtor(struct m_node *node);
 struct m_node *mNodeNext(struct m_node *node);
 char *mNodeKey(struct m_node *node);

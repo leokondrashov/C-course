@@ -7,6 +7,17 @@
 #include <unistd.h>
 #include <math.h>
 
+#define BYTES_IN_LINE 16
+#define INTS_IN_LINE 4
+
+#define POP_ stackPop(&cpu->st)
+#define PUSH_(val) stackPush(&cpu->st, val)
+
+#define GET(name) {\
+	(name) = *((int *) &cpu->program[cpu->ip]); \
+	cpu->ip += sizeof(int); \
+}
+
 enum CPUError {
 	CPU_NO_ERROR,
 	CPU_STACK_ERROR,
@@ -27,13 +38,15 @@ struct CPU {
 	unsigned int programSize;
 	int errno;
 };
-
+/*!
+ * @brief constructor of struct CPU
+ * @param cpu
+ */
 void CPUCtor(struct CPU *cpu) {
 	assert(cpu);
 	
 	cpu->errno = CPU_NO_ERROR;
-
-//	cpu->st = {};
+	
 	stackCtor(&(cpu->st));
 	if (!stackOk(&(cpu->st)))
 		cpu->errno = CPU_STACK_ERROR;
@@ -44,7 +57,7 @@ void CPUCtor(struct CPU *cpu) {
 	
 	cpu->r = (int *) calloc(REGISTERS_COUNT, sizeof(int));
 	cpu->mem = (int *) calloc(MEM_SIZE, sizeof(int));
-	if (!(cpu->r && cpu->mem))
+	if (cpu->r == NULL || cpu->mem == NULL)
 		cpu->errno = CPU_ALLOCATION_ERROR;
 	
 	cpu->ip = 0;
@@ -52,6 +65,10 @@ void CPUCtor(struct CPU *cpu) {
 	cpu->programSize = 0;
 }
 
+/*!
+ * @brief destructor of struct CPU
+ * @param cpu
+ */
 void CPUDtor(struct CPU *cpu) {
 	assert(cpu);
 	
@@ -69,8 +86,14 @@ void CPUDtor(struct CPU *cpu) {
 	cpu->errno = CPU_NO_ERROR;
 }
 
+/*!
+ * @brief checks if cpu is Ok
+ * @param cpu
+ * @return 1 if cpu is Ok, 0 otherwise
+ */
 int CPUOk(struct CPU *cpu) {
-	assert(cpu);
+	if (cpu == NULL)
+		return 0;
 	
 	if (cpu->errno)
 		return 0;
@@ -80,16 +103,30 @@ int CPUOk(struct CPU *cpu) {
 		return 0;
 	}
 	
+	if (!stackOk(&(cpu->callStack))) {
+		cpu->errno = CPU_STACK_ERROR;
+		return 0;
+	}
+	
 	if (cpu->ip > cpu->programSize) {
 		cpu->errno = CPU_IP_OUT_OF_PROG;
 		return 0;
 	}
 	
-	return cpu->r && cpu->mem;
+	if (cpu->r == NULL || cpu->mem == NULL)
+		return 0;
+	
+	return 1;
 }
 
+/*!
+ * @brief debug info for cpu
+ * @param cpu
+ */
 void CPUDump(struct CPU *cpu) {
 	printf("CPU [%p] {\n", cpu);
+	
+	printf("errno = %d\n", cpu->errno);
 	
 	printf("Stack :\n");
 	stackDump(&(cpu->st));
@@ -103,28 +140,32 @@ void CPUDump(struct CPU *cpu) {
 	printf("}\n");
 	
 	printf("mem:[%p] {\n", cpu->mem);
-	for (int i = 0; i < MEM_SIZE; i += 4) {
+	for (int i = 0; i < MEM_SIZE; i += INTS_IN_LINE) {
 		printf("%03x:", i);
-		for (int j = 0; j < 4; j++)
+		for (int j = 0; j < INTS_IN_LINE; j++)
 			printf("%08x ", cpu->mem[i + j]);
 		printf("\n");
 	}
 	printf("}\n");
 	
 	printf("program[%d]:[%p] {\n", cpu->programSize, cpu->program);
-	for (unsigned int i = 0; i < cpu->programSize; i += 16) {
+	for (unsigned int i = 0; i < cpu->programSize; i += BYTES_IN_LINE) {
 		printf("%08x:", i);
-		for (int j = 0; j < 16 && (i + j < cpu->programSize); j++)
+		for (int j = 0; j < BYTES_IN_LINE && (i + j < cpu->programSize); j++)
 			printf("%02x ", (unsigned char) cpu->program[i + j]);
 		printf("\n");
 	}
-	printf("}\n");
-	
 	printf("ip = %08x\n", cpu->ip);
 	
-	printf("errno = %d\n", cpu->errno);
+	printf("}\n");
 }
 
+/*!
+ * @brief loads program to CPU
+ * @param cpu
+ * @param file
+ * @return 1 if loading was successful 0 otherwise
+ */
 int CPULoadProgramFromFile(struct CPU *cpu, char *file) {
 	assert(cpu);
 	assert(file);
@@ -148,6 +189,11 @@ int CPULoadProgramFromFile(struct CPU *cpu, char *file) {
 	return 1;
 }
 
+/*!
+ * @brief executes loaded program
+ * @param cpu
+ * @return 1 if execution was successful, 0 if error occured
+ */
 int CPURunProgram(struct CPU *cpu) {
 	assert(cpu);
 	
@@ -155,215 +201,18 @@ int CPURunProgram(struct CPU *cpu) {
 		return 0;
 	
 	cpu->ip = 0;
+	int arg1 = 0, arg2 = 0, addr = 0;
 	while (cpu->program[cpu->ip]) {
-		int a = 0, b = 0, addr = 0;
 		switch (cpu->program[cpu->ip]) {
-		case PUSH:
-			a = *((int *) &cpu->program[cpu->ip + 1]);
-			stackPush(&cpu->st, a);
-			cpu->ip += 1 + sizeof(int);
-			break;
-		case PUSHR:
-			a = *((int *) &cpu->program[cpu->ip + 1]);
-			if (a >= REGISTERS_COUNT) {
-				cpu->errno = CPU_ADDRESS_OUT_OF_MEMORY;
-				return 0;
-			}
-			stackPush(&cpu->st, cpu->r[a]);
-			cpu->ip += 1 + sizeof(int);
-			break;
-		case PUSHMEM:
-			a = *((int *) &cpu->program[cpu->ip + 1]);
-			if (a >= MEM_SIZE) {
-				cpu->errno = CPU_ADDRESS_OUT_OF_MEMORY;
-				return 0;
-			}
-			stackPush(&cpu->st, cpu->mem[a]);
-			sleep(1);
-			cpu->ip += 1 + sizeof(int);
-			break;
-		case PUSHINDIR:
-			a = *((int *) &cpu->program[cpu->ip + 1]);
-			if (a >= REGISTERS_COUNT || cpu->r[a] >= MEM_SIZE) {
-				cpu->errno = CPU_ADDRESS_OUT_OF_MEMORY;
-				return 0;
-			}
-			stackPush(&cpu->st, cpu->mem[cpu->r[a]]);
-			sleep(1);
-			cpu->ip += 1 + sizeof(int);
-			break;
-		case PUSHINDIROFFSET:
-			a = *((int *) &cpu->program[cpu->ip + 1]);
-			b = *((int *) &cpu->program[cpu->ip + 1 + sizeof(int)]);
-			if (a >= REGISTERS_COUNT || cpu->r[a] + b >= MEM_SIZE) {
-				cpu->errno = CPU_ADDRESS_OUT_OF_MEMORY;
-				return 0;
-			}
-			stackPush(&cpu->st, cpu->mem[cpu->r[a] + b]);
-			sleep(1);
-			cpu->ip += 1 + 2 * sizeof(int);
-			break;
 		
-		case POP:
-			stackPop(&cpu->st);
-			cpu->ip++;
+		#define DEF_CMD(name, code, argc, instr) \
+		case CMD_##name: \
+			cpu->ip++; \
+			instr; \
 			break;
-		case POPR:
-			a = *((int *) &cpu->program[cpu->ip + 1]);
-			if (a >= REGISTERS_COUNT) {
-				cpu->errno = CPU_ADDRESS_OUT_OF_MEMORY;
-				return 0;
-			}
-			cpu->r[a] = stackPop(&cpu->st);
-			cpu->ip += 1 + sizeof(int);
-			break;
-		case POPMEM:
-			a = *((int *) &cpu->program[cpu->ip + 1]);
-			if (a >= MEM_SIZE) {
-				cpu->errno = CPU_ADDRESS_OUT_OF_MEMORY;
-				return 0;
-			}
-			cpu->mem[a] = stackPop(&cpu->st);
-			sleep(1);
-			cpu->ip += 1 + sizeof(int);
-			break;
-		case POPINDIR:
-			a = *((int *) &cpu->program[cpu->ip + 1]);
-			if (a >= REGISTERS_COUNT || cpu->r[a] >= MEM_SIZE) {
-				cpu->errno = CPU_ADDRESS_OUT_OF_MEMORY;
-				return 0;
-			}
-			cpu->mem[cpu->r[a]] = stackPop(&cpu->st);
-			sleep(1);
-			cpu->ip += 1 + sizeof(int);
-			break;
-		case POPINDIROFFSET:
-			a = *((int *) &cpu->program[cpu->ip + 1]);
-			b = *((int *) &cpu->program[cpu->ip + 1 + sizeof(int)]);
-			if (a >= REGISTERS_COUNT || cpu->r[a] + b >= MEM_SIZE) {
-				cpu->errno = CPU_ADDRESS_OUT_OF_MEMORY;
-				return 0;
-			}
-			cpu->mem[cpu->r[a] + b] = stackPop(&cpu->st);
-			sleep(1);
-			cpu->ip += 1 + 2 * sizeof(int);
-			break;
+		#include "commands.h"
+		#undef DEF_CMD
 		
-		case ADD:
-			a = stackPop(&cpu->st);
-			b = stackPop(&cpu->st);
-			stackPush(&cpu->st, a + b);
-			cpu->ip++;
-			break;
-		case SUB:
-			a = stackPop(&cpu->st);
-			b = stackPop(&cpu->st);
-			stackPush(&cpu->st, b - a);
-			cpu->ip++;
-			break;
-		case MUL:
-			a = stackPop(&cpu->st);
-			b = stackPop(&cpu->st);
-			stackPush(&cpu->st, a * b);
-			cpu->ip++;
-			break;
-		case DIV:
-			a = stackPop(&cpu->st);
-			b = stackPop(&cpu->st);
-			stackPush(&cpu->st, b / a);
-			cpu->ip++;
-			break;
-		case SQRT:
-			stackPush(&cpu->st, (int) sqrt(stackPop(&cpu->st)));
-			cpu->ip++;
-			break;
-		
-		case IN:
-			a = 0;
-			scanf("%d", &a);
-			stackPush(&cpu->st, a);
-			cpu->ip++;
-			break;
-		case OUT:
-			printf("%d\n", stackPop(&cpu->st));
-//			CPUDump(cpu);
-			cpu->ip++;
-			break;
-		
-		case JMP:
-			addr = *((int *) &cpu->program[cpu->ip + 1]);
-			if (addr >= cpu->programSize) {
-				cpu->errno = CPU_IP_OUT_OF_PROG;
-				return 0;
-			}
-			cpu->ip = addr;
-			break;
-		case JA:
-			addr = *((int *) &cpu->program[cpu->ip + 1]);
-			if (addr >= cpu->programSize) {
-				cpu->errno = CPU_IP_OUT_OF_PROG;
-				return 0;
-			}
-			a = stackPop(&cpu->st);
-			b = stackPop(&cpu->st);
-			if (b > a)
-				cpu->ip = addr;
-			else
-				cpu->ip += 1 + sizeof(int);
-			break;
-		case JB:
-			addr = *((int *) &cpu->program[cpu->ip + 1]);
-			if (addr >= cpu->programSize) {
-				cpu->errno = CPU_IP_OUT_OF_PROG;
-				return 0;
-			}
-			a = stackPop(&cpu->st);
-			b = stackPop(&cpu->st);
-			if (b < a)
-				cpu->ip = addr;
-			else
-				cpu->ip += 1 + sizeof(int);
-			break;
-		case JE:
-			addr = *((int *) &cpu->program[cpu->ip + 1]);
-			if (addr >= cpu->programSize) {
-				cpu->errno = CPU_IP_OUT_OF_PROG;
-				return 0;
-			}
-			a = stackPop(&cpu->st);
-			b = stackPop(&cpu->st);
-			if (b == a)
-				cpu->ip = addr;
-			else
-				cpu->ip += 1 + sizeof(int);
-			break;
-		case JNE:
-			addr = *((int *) &cpu->program[cpu->ip + 1]);
-			if (addr >= cpu->programSize) {
-				cpu->errno = CPU_IP_OUT_OF_PROG;
-				return 0;
-			}
-			a = stackPop(&cpu->st);
-			b = stackPop(&cpu->st);
-			if (b != a)
-				cpu->ip = addr;
-			else
-				cpu->ip += 1 + sizeof(int);
-			break;
-			
-		case CALL:
-			addr = *((int *) &cpu->program[cpu->ip + 1]);
-			if (addr >= cpu->programSize) {
-				cpu->errno = CPU_IP_OUT_OF_PROG;
-				return 0;
-			}
-			cpu->ip += 1 + sizeof(int);
-			stackPush(&cpu->callStack, cpu->ip);
-			cpu->ip = addr;
-			break;
-		case RET:
-			cpu->ip = stackPop(&cpu->callStack);
-			break;
 		default:
 			cpu->errno = CPU_UNKNOWN_OPCODE;
 			return 0;
@@ -381,6 +230,7 @@ int main(int argc, char *argv[]) {
 	struct CPU cpu = {};
 	CPUCtor(&cpu);
 	CPULoadProgramFromFile(&cpu, argv[1]);
+//	CPUDump(&cpu);
 	CPURunProgram(&cpu);
 //	CPUDump(&cpu);
 	CPUDtor(&cpu);
