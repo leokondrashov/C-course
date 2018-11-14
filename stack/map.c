@@ -269,7 +269,7 @@ struct m_node *mapEnd(map *m) {
  * @param key
  * @param val
  */
-void mNodeCtor(struct m_node *node, const char *key, int val) {
+int mNodeCtor(struct m_node *node, const char *key, int val) {
 	assert(node);
 	assert(key);
 	

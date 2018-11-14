@@ -22,7 +22,7 @@ struct m_node {
 	int val;
 };
 
-void mapCtor(map *m);
+int mapCtor(map *m);
 void mapDtor(map *m);
 
 int mapOk(map *m);
@@ -41,7 +41,7 @@ void mapResetErrno(map *m);
 struct m_node *mapBegin(map *m);
 struct m_node *mapEnd(map *m);
 
-void mNodeCtor(struct m_node *node, const char *key, int val);
+int mNodeCtor(struct m_node *node, const char *key, int val);
 void mNodeDtor(struct m_node *node);
 struct m_node *mNodeNext(struct m_node *node);
 char *mNodeKey(struct m_node *node);
