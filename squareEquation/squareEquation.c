@@ -23,7 +23,7 @@ int main() {
 	
 	double x1 = 0, x2 = 0;
 	int RootCount = SolveSquareEquation(a, b, c, &x1, &x2);
-
+	
 	switch (RootCount) {
 		case 0:
 			printf("$ No roots\n");
@@ -61,13 +61,13 @@ int main() {
 */
 int SolveSquareEquation(double a, double b, double c, double *x1, double *x2) {
 	assert(x1 != NULL);
-	assert(x2 != NULL);	
+	assert(x2 != NULL);
 	assert(x1 != x2);
-
+	
 	assert(isfinite(a));
 	assert(isfinite(b));
 	assert(isfinite(c));
-
+	
 	if (a == 0) {
 		*x2 = 0;
 		return SolveLinearEquation(b, c, x1);

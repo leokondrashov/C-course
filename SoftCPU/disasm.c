@@ -11,7 +11,7 @@ int main(int argc, char *argv[]) {
 		printf("using format: disasm file [-l listing_file] [-o output_file]\n");
 		return 0;
 	}
-
+	
 	char *infile = NULL, *outfile = NULL;
 	for (int i = 1; i < argc; i++) {
 		if (argv[i][0] == '-') {
@@ -28,17 +28,17 @@ int main(int argc, char *argv[]) {
 			return 0;
 		}
 	}
-
+	
 	if (infile == NULL) {
 		printf("missing file\n");
 		printf("using format: disasm file [-o output_file]\n");
 		return 0;
 	}
-
+	
 	if (outfile == NULL) {
 		outfile = "a.asm";
 	}
-
+	
 	processFile(infile, outfile);
 }
 
@@ -65,19 +65,19 @@ void writeArgs(int argc, int *argv, FILE *outfile) {
 void processFile(const char *infile, const char *outfile) {
 	assert(infile);
 	assert(outfile);
-
+	
 	int fileSize = sizeofFile(infile);
 	if (fileSize < 0) {
 		printf("Error reading file %s", infile);
 		return;
 	}
-	char *binaryCode = (char *)calloc(fileSize, sizeof(char));
+	char *binaryCode = (char *) calloc(fileSize, sizeof(char));
 	FILE *in = fopen(infile, "rb");
 	fread(binaryCode, sizeof(char), fileSize, in);
 	fclose(in);
-
+	
 	FILE *out = fopen(outfile, "wb");
-
+	
 	int ip = 0;
 	while (ip < fileSize) {
 		switch (binaryCode[ip]) {

@@ -12,8 +12,7 @@
 #define OUTPUT_FILE_2 "ShakespeareSonnetsSortedFromEnd.txt"
 #define OUTPUT_FILE_3 "ShakespeareSonnetsOriginal.txt"
 
-void processTextFromFile(const char *ifile, const char *ofile1, 
-		const char *ofile2, const char *ofile3);
+void processTextFromFile(const char *ifile, const char *ofile1, const char *ofile2, const char *ofile3);
 
 int main() {
 	processTextFromFile(INPUT_FILE, OUTPUT_FILE_1, OUTPUT_FILE_2, OUTPUT_FILE_3);
@@ -23,8 +22,7 @@ int main() {
 * \brief process text (sort text from ifile forward and write it to ofile1, sort backward and write it to ofile2, original text is written to ofile3)
 */
 
-void processTextFromFile(const char *ifile, const char *ofile1, 
-			const char *ofile2, const char *ofile3) {
+void processTextFromFile(const char *ifile, const char *ofile1, const char *ofile2, const char *ofile3) {
 	assert(ifile != NULL);
 	assert(ofile1 != NULL);
 	assert(ofile2 != NULL);
@@ -35,9 +33,9 @@ void processTextFromFile(const char *ifile, const char *ofile1,
 		printf("Some troubles with reading file %s", ifile);
 		exit(1);
 	}
-	int nLines = countLines(origLines);	
+	int nLines = countLines(origLines);
 	
-	char **sortedLines = (char **)calloc(nLines + 1, sizeof(*sortedLines));
+	char **sortedLines = (char **) calloc(nLines + 1, sizeof(*sortedLines));
 	for (int i = 0; origLines[i]; i++)
 		sortedLines[i] = origLines[i];
 	sortedLines[nLines] = NULL;

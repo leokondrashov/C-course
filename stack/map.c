@@ -18,12 +18,14 @@ int main() {
  * @brief constructor of struct map
  * @param m
  */
-void mapCtor(map *m) {
+int mapCtor(map *m) {
 	assert(m);
 	
 	m->head = NULL;
 	m->size = 0;
 	m->errno = MAP_NO_ERROR;
+	
+	return m->errno;
 }
 
 /*!
@@ -96,7 +98,7 @@ int mapAdd(map *m, const char *key, int val) {
 	assert(key);
 	
 	if (m->head == NULL) {
-		struct m_node *node = (struct m_node *)calloc(1, sizeof(struct m_node));
+		struct m_node *node = (struct m_node *) calloc(1, sizeof(struct m_node));
 		if (node == NULL) {
 			m->errno = MAP_ALLOCATION_ERROR;
 			return 0;
@@ -115,7 +117,7 @@ int mapAdd(map *m, const char *key, int val) {
 	}
 	if (strcmp(cur->key, key) == 0)
 		return 2;
-	struct m_node *node = (struct m_node *)calloc(1, sizeof(struct m_node));
+	struct m_node *node = (struct m_node *) calloc(1, sizeof(struct m_node));
 	if (node == NULL) {
 		m->errno = MAP_ALLOCATION_ERROR;
 		return 0;
@@ -197,7 +199,7 @@ int mapFind(map *m, const char *key) {
 	assert(m);
 	assert(key);
 	
-	if (m->head == NULL) 
+	if (m->head == NULL)
 		return 0;
 	
 	struct m_node *cur = m->head;
@@ -276,7 +278,7 @@ int mNodeCtor(struct m_node *node, const char *key, int val) {
 	node->next = NULL;
 	
 	int len = strlen(key);
-	node->key = (char *)calloc(len + 1, sizeof(char));
+	node->key = (char *) calloc(len + 1, sizeof(char));
 	strcpy(node->key, key);
 	
 	node->val = val;
@@ -305,7 +307,7 @@ void mNodeDtor(struct m_node *node) {
  */
 struct m_node *mNodeNext(struct m_node *node) {
 	assert(node);
-		
+	
 	return node->next;
 }
 
@@ -316,7 +318,7 @@ struct m_node *mNodeNext(struct m_node *node) {
  */
 char *mNodeKey(struct m_node *node) {
 	assert(node);
-		
+	
 	return node->key;
 }
 
@@ -327,6 +329,6 @@ char *mNodeKey(struct m_node *node) {
  */
 int mNodeVal(struct m_node *node) {
 	assert(node);
-		
+	
 	return node->val;
 }

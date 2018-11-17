@@ -83,7 +83,7 @@ void stackSetCapacity(stack *s, int c) {
 	assert(c);
 	
 	if (s->capacity == 0) {
-		if ((s->data = (data_t *)calloc(c, sizeof(data_t))) == NULL) {
+		if ((s->data = (data_t *) calloc(c, sizeof(data_t))) == NULL) {
 			s->errno = STACK_ALLOCATION_ERROR;
 		} else {
 			s->capacity = c;
@@ -91,7 +91,7 @@ void stackSetCapacity(stack *s, int c) {
 		return;
 	}
 	
-	data_t *tmp = realloc(s->data, c * sizeof(data_t));
+	data_t *tmp = (data_t *) realloc(s->data, c * sizeof(data_t));
 	if (tmp == NULL) {
 		s->errno = STACK_REALLOCATION_ERROR;
 	} else {

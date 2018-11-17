@@ -17,14 +17,14 @@ char **readTextFromFile(const char *file) {
 	int buffSize = sizeofFile(file);
 	if (buffSize < 0)
 		return NULL;
-	char *buff = (char *)calloc(buffSize + 1, sizeof(char));
+	char *buff = (char *) calloc(buffSize + 1, sizeof(char));
 	
 	FILE *input = fopen(file, "rb");
 	fread(buff, sizeof(char), buffSize, input);
 	fclose(input);
 	
 	int nLines = countCharsInStr('\n', buff) + 2; //because of ending 0 and possibly absent \n after last line
-	char **lines = (char **)calloc(nLines, sizeof(*lines));
+	char **lines = (char **) calloc(nLines, sizeof(*lines));
 	int i = 0;
 	lines[0] = buff;
 	for (char *it = strchr(buff, '\n'); it; it = strchr(it + 1, '\n')) {
@@ -57,7 +57,7 @@ int countLines(char **lines) {
 	assert(lines != NULL);
 	
 	int i = 0;
-	while(lines[i])
+	while (lines[i])
 		i++;
 	return i;
 }
@@ -126,7 +126,7 @@ int getLine(char buff[], int maxSize) {
 void sort(char *lines[], int left, int right, int (*comp)(const char *, const char *)) {
 	void swap(char *lines[], int i, int j);
 	assert(lines != NULL);
-
+	
 	int last;
 	
 	if (left >= right)
@@ -151,9 +151,9 @@ void sort(char *lines[], int left, int right, int (*comp)(const char *, const ch
 
 void swap(char *lines[], int i, int j) {
 	assert(lines != NULL);
-
+	
 	char *t;
-
+	
 	t = lines[i];
 	lines[i] = lines[j];
 	lines[j] = t;
