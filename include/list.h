@@ -16,7 +16,7 @@ enum listError {
 };
 
 struct list {
-	list_data_t **data;
+	list_data_t *data;
 	int *next;
 	int *prev;
 	unsigned int capacity;
@@ -35,10 +35,10 @@ int listOk(list *l);
 
 void listDump(list *l);
 
-int listInsert(list *l, int idx, list_data_t *el);
+int listInsert(list *l, int idx, list_data_t el);
 int listRemove(list *l, int idx);
 
-int listFindVerySlow(list *l, list_data_t *el);
+int listFindVerySlow(list *l, list_data_t el);
 
 int listNext(list *l, int idx);
 int listHasNext(list *l, int idx);
@@ -48,7 +48,7 @@ int listHasPrev(list *l, int idx);
 int listHead(list *l);
 int listTail(list *l);
 
-list_data_t *listGet(list *l, int idx);
+list_data_t listGet(list *l, int idx);
 
 int listErrno(list *l);
 void listResetErrno(list *l);

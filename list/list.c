@@ -6,16 +6,16 @@
 int listCtor(list *l, unsigned int capacity) {
 	assert(l);
 	
-	l->data = (list_data_t **)calloc(capacity + 1, sizeof(*(l->data)));
-	l->next = (int *)calloc(capacity + 1, sizeof(*(l->next)));
-	l->prev = (int *)calloc(capacity + 1, sizeof(*(l->prev)));
+	l->data = (list_data_t *) calloc(capacity + 1, sizeof(*(l->data)));
+	l->next = (int *) calloc(capacity + 1, sizeof(*(l->next)));
+	l->prev = (int *) calloc(capacity + 1, sizeof(*(l->prev)));
 	
 	if (l->data == NULL || l->next == NULL || l->prev == NULL) {
 		l->errno = LIST_ALLOCATION_ERROR;
 		return l->errno;
 	}
 	
-	l->data[0] = NULL;
+	l->data[0] = 0;
 	l->next[0] = 0;
 	l->prev[0] = 0;
 	for (int i = 1; i < capacity; i++) { // free list
@@ -35,15 +35,23 @@ int listCtor(list *l, unsigned int capacity) {
 	
 	l->sorted = 1;
 	
+	// call OK !!!!
+	
 	return l->errno;
 }
 
 void listDtor(list *l) {
 	assert(l);
+	assert(l->data);
+	assert(l->next);
+	assert(l->prev);
 	
 	free(l->data);
+	l->data = NULL;
 	free(l->next);
+	l->next = NULL;
 	free(l->prev);
+	l->prev = NULL;
 	
 	l->capacity = 0;
 	l->size = 0;
@@ -69,7 +77,7 @@ int listOk(list *l) {
 	}
 	
 	if (!((l->head == 0 && l->tail == 0) ||
-		(l->head > 0 && l->tail > 0))) {
+			(l->head > 0 && l->tail > 0))) {
 		l->errno = LIST_DATA_LIST_ERROR;
 		return 0;
 	}
@@ -191,7 +199,7 @@ void listDump(list *l) {
 	printf("\tcapacity = %d\n", l->capacity);
 	printf("\tdata {\n");
 	for (int i = 0; i <= l->capacity; i++) {
-		printf("\t%d: %p, %d, %d\n", i, l->data[i], l->next[i], l->prev[i]);
+		printf("\t%d: %d, %d, %d\n", i, l->data[i], l->next[i], l->prev[i]);
 	}
 	printf("\t}\n");
 	printf("\tsorted = %d\n", l->sorted);
@@ -200,7 +208,7 @@ void listDump(list *l) {
 	plotGraph(l);
 }
 
-int listInsert(list *l, int idx, list_data_t *el) {
+int listInsert(list *l, int idx, list_data_t el) {
 	assert(l);
 	
 	if (l->prev[idx] == -1) {
@@ -282,7 +290,7 @@ int listRemove(list *l, int idx) {
 	}
 	
 	if (l->size == 1) {
-		l->data[l->head] = NULL;
+		l->data[l->head] = 0;
 		l->next[l->head] = l->free;
 		l->prev[l->head] = -1;
 		
@@ -299,7 +307,7 @@ int listRemove(list *l, int idx) {
 		l->head = l->next[l->head];
 		l->prev[l->head] = 0;
 		
-		l->data[idx] = NULL;
+		l->data[idx] = 0;
 		l->next[idx] = l->free;
 		l->prev[idx] = -1;
 		l->free = idx;
@@ -313,7 +321,7 @@ int listRemove(list *l, int idx) {
 		l->tail = l->prev[l->tail];
 		l->next[l->tail] = 0;
 		
-		l->data[idx] = NULL;
+		l->data[idx] = 0;
 		l->next[idx] = l->free;
 		l->prev[idx] = -1;
 		l->free = idx;
@@ -336,7 +344,7 @@ int listRemove(list *l, int idx) {
 	return l->errno;
 }
 
-int listFindVerySlow(list *l, list_data_t *el) {
+int listFindVerySlow(list *l, list_data_t el) {
 	assert(l);
 	
 	int it = l->head;
@@ -385,7 +393,7 @@ int listTail(list *l) {
 	return l->tail;
 }
 
-list_data_t *listGet(list *l, int idx) {
+list_data_t listGet(list *l, int idx) {
 	assert(l);
 	
 	return l->data[idx];
@@ -423,11 +431,11 @@ int listSort(list *l) {
 	
 	l->free = n;
 	for (; n < l->capacity; n++) {
-		l->data[n] = NULL;
+		l->data[n] = 0;
 		l->next[n] = n + 1;
 		l->prev[n] = -1;
 	}
-	l->data[l->capacity] = NULL;
+	l->data[l->capacity] = 0;
 	l->next[l->capacity] = 0;
 	l->prev[l->capacity] = -1;
 	
@@ -467,7 +475,7 @@ int swap(list *l, int i, int j) {
 		l->next[i] = jnext;
 		l->prev[i] = jprev;
 		
-		l->data[j] = NULL;
+		l->data[j] = 0;
 		l->next[j] = l->free;
 		l->prev[j] = -1;
 		
@@ -491,7 +499,7 @@ int swap(list *l, int i, int j) {
 				j = t;
 			}
 			
-			list_data_t *t = l->data[i];
+			list_data_t t = l->data[i];
 			l->data[i] = l->data[j];
 			l->data[j] = t;
 			
@@ -531,7 +539,7 @@ int swap(list *l, int i, int j) {
 		int jnext = l->next[j], jprev = l->prev[j];
 		int newHead = 0, newTail = 0;
 		
-		list_data_t *t = l->data[i];
+		list_data_t t = l->data[i];
 		l->data[i] = l->data[j];
 		l->data[j] = t;
 		
@@ -584,7 +592,7 @@ int listResize(list *l, unsigned int size) {
 		return 1;
 	}
 	
-	list_data_t **newData = (list_data_t **) realloc(l->data, (size + 1) * sizeof(*newData));
+	list_data_t *newData = (list_data_t *) realloc(l->data, (size + 1) * sizeof(*newData));
 	int *newNext = (int *) realloc(l->next, (size + 1) * sizeof(*newNext));
 	int *newPrev = (int *) realloc(l->prev, (size + 1) * sizeof(*newPrev));
 	if (newData == NULL || newNext == NULL || newPrev == NULL) {
@@ -599,7 +607,7 @@ int listResize(list *l, unsigned int size) {
 	int newFreePos = l->capacity + 1;
 	if (l->free == 0) {
 		l->free = newFreePos++;
-		l->data[l->free] = NULL;
+		l->data[l->free] = 0;
 		l->next[l->free] = newFreePos;
 		l->prev[l->free] = -1;
 	} else {
@@ -608,11 +616,11 @@ int listResize(list *l, unsigned int size) {
 		l->next[it] = newFreePos;
 	}
 	for (int i = newFreePos; i < size; i++) {
-		l->data[i] = NULL;
+		l->data[i] = 0;
 		l->next[i] = i + 1;
 		l->prev[i] = -1;
 	}
-	l->data[size] = NULL;
+	l->data[size] = 0;
 	l->next[size] = 0;
 	l->prev[size] = -1;
 	

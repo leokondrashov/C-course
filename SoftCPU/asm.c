@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
 		printf("using format: asm file [-l listing_file] [-o output_file]\n");
 		return 0;
 	}
-
+	
 	char *infile = NULL, *lstfile = NULL, *outfile = NULL;
 	for (int i = 1; i < argc; i++) {
 		if (argv[i][0] == '-') {
@@ -40,21 +40,21 @@ int main(int argc, char *argv[]) {
 			return 0;
 		}
 	}
-
+	
 	if (infile == NULL) {
 		printf("missing file\n");
 		printf("using format: asm file [-l listing_file] [-o output_file]\n");
 		return 0;
 	}
-
+	
 	if (lstfile == NULL) {
 		lstfile = "a.out.lst";
 	}
-
+	
 	if (outfile == NULL) {
 		outfile = "a.out";
 	}
-
+	
 	processSource(infile, lstfile, outfile);
 }
 
@@ -83,7 +83,7 @@ void writeLabels(FILE *lst) {
 int isLabel(const char *line) {
 	assert(line);
 	
-	char *tmp = (char *)calloc(MAX_LABEL_SIZE, sizeof(char));
+	char *tmp = (char *) calloc(MAX_LABEL_SIZE, sizeof(char));
 	int val = sscanf(line, "%[a-zA-Z_0-9]%[:]", tmp, tmp);
 	free(tmp);
 	return val == 2;
@@ -114,7 +114,7 @@ int getLabelAddress(const char *line) {
 void addLabel(const char *line, int val) {
 	assert(line);
 	
-	char *str = (char *)calloc(MAX_LABEL_SIZE, sizeof(char));
+	char *str = (char *) calloc(MAX_LABEL_SIZE, sizeof(char));
 	sscanf(line, "%[a-zA-Z_0-9]%*[:]", str);
 	mapAdd(&labels, str, val);
 	free(str);
@@ -130,7 +130,7 @@ void processSource(const char *infile, const char *lstfile, const char *outfile)
 	assert(infile);
 	assert(lstfile);
 	assert(outfile);
-
+	
 	char **source = readTextFromFile(infile);
 	if (source == NULL) {
 		printf("Error reading source file: %s", infile);
@@ -139,16 +139,16 @@ void processSource(const char *infile, const char *lstfile, const char *outfile)
 	int nLines = countLines(source);
 	
 	mapCtor(&labels);
-
+	
 	compile(source, nLines, lstfile, outfile);
 	if (!error)
 		compile(source, nLines, lstfile, outfile); // for correct labels
-
+	
 	if (error) {
 		remove(lstfile);
 		remove(outfile);
 	}
-
+	
 	mapDtor(&labels);
 }
 
@@ -164,7 +164,7 @@ int getArgs(const char *args, int *argv, int maxArgc) {
 	assert(argv);
 	
 	int argc = 0, nextPos = 0, arg = 0;
-	char *label = (char *)calloc(MAX_LABEL_SIZE, sizeof(char));
+	char *label = (char *) calloc(MAX_LABEL_SIZE, sizeof(char));
 	
 	do {
 		nextPos = 0;
@@ -200,9 +200,9 @@ void writeBinArgs(int argc, int *argv, FILE *lstfile, FILE *outfile) {
 	assert(lstfile);
 	assert(outfile);
 	
-	char *chars = (char *)argv;
+	char *chars = (char *) argv;
 	for (int i = 0; i < argc * sizeof(int); i++) {
-		fprintf(lstfile, "%02x ", (unsigned char)chars[i]);
+		fprintf(lstfile, "%02x ", (unsigned char) chars[i]);
 		fprintf(outfile, "%c", chars[i]);
 	}
 }
@@ -233,7 +233,7 @@ void compile(const char **source, int nLines, const char *lstfile, const char *o
 	assert(source);
 	assert(lstfile);
 	assert(outfile);
-
+	
 	int pc = 0; // program counter
 	FILE *lst = fopen(lstfile, "wb");
 	FILE *out = fopen(outfile, "wb");
@@ -250,10 +250,10 @@ void compile(const char **source, int nLines, const char *lstfile, const char *o
 	#include "commands.h"
 	#undef DEF_CMD
 	
-	char *combuff = (char *)calloc(maxCmdLen, sizeof(char));
-	int *argbuff = (int *)calloc(maxArgc, sizeof(int));
+	char *combuff = (char *) calloc(maxCmdLen, sizeof(char));
+	int *argbuff = (int *) calloc(maxArgc, sizeof(int));
 	int argsPos = 0;
-
+	
 	for (int i = 0; i < nLines; i++) {
 		combuff[0] = '\0';
 		
@@ -279,15 +279,15 @@ void compile(const char **source, int nLines, const char *lstfile, const char *o
 		#undef DEF_CMD
 		
 		if (isLabel(source[i])) {
-				addLabel(source[i], pc);
+			addLabel(source[i], pc);
 		} else {
 			printf("Unknown command on line %d: %s\n", i, combuff);
 			error = 1;
 		}
 	}
-
+	
 	writeLabels(lst);
-
+	
 	free(combuff);
 	free(argbuff);
 	fclose(out);

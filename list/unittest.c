@@ -12,7 +12,7 @@ int main() {
 	while (op != '0') {
 		if (op == '+') {
 			scanf("%d %d", &a, &b);
-			listInsert(&l, a, data + b);
+			listInsert(&l, a, data[b]);
 		} else if (op == '-') {
 			scanf("%d", &a);
 			listRemove(&l, a);
