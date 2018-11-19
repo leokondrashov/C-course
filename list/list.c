@@ -211,7 +211,7 @@ void listDump(list *l) {
 int listInsert(list *l, int idx, list_data_t el) {
 	assert(l);
 	
-	if (l->prev[idx] == -1) {
+	if (idx > l->capacity || idx < 0 || l->prev[idx] == -1) {
 		l->errno = LIST_INDEX_OUT_OF_BOUNDS;
 		return l->errno;
 	}
@@ -284,7 +284,7 @@ int listInsert(list *l, int idx, list_data_t el) {
 int listRemove(list *l, int idx) {
 	assert(l);
 	
-	if (l->prev[idx] == -1 || idx == 0) {
+	if (idx > l->capacity || idx <= 0 || l->prev[idx] == -1) {
 		l->errno = LIST_INDEX_OUT_OF_BOUNDS;
 		return l->errno;
 	}
@@ -333,7 +333,7 @@ int listRemove(list *l, int idx) {
 	l->next[l->prev[idx]] = l->next[idx];
 	l->prev[l->next[idx]] = l->prev[idx];
 	
-	l->data[idx] = NULL;
+	l->data[idx] = 0;
 	l->next[idx] = l->free;
 	l->prev[idx] = -1;
 	l->free = idx;
@@ -360,11 +360,21 @@ int listFindVerySlow(list *l, list_data_t el) {
 int listNext(list *l, int idx) {
 	assert(l);
 	
+	if (idx > l->capacity || idx <= 0) {
+		l->errno = LIST_INDEX_OUT_OF_BOUNDS;
+		return -1;
+	}
+	
 	return l->next[idx];
 }
 
 int listHasNext(list *l, int idx) {
 	assert(l);
+	
+	if (idx > l->capacity || idx <= 0) {
+		l->errno = LIST_INDEX_OUT_OF_BOUNDS;
+		return 0;
+	}
 	
 	return l->next[idx] != 0;
 }
@@ -372,11 +382,21 @@ int listHasNext(list *l, int idx) {
 int listPrev(list *l, int idx) {
 	assert(l);
 	
+	if (idx > l->capacity || idx <= 0) {
+		l->errno = LIST_INDEX_OUT_OF_BOUNDS;
+		return -1;
+	}
+	
 	return l->prev[idx];
 }
 
 int listHasPrev(list *l, int idx) {
 	assert(l);
+	
+	if (idx > l->capacity || idx <= 0) {
+		l->errno = LIST_INDEX_OUT_OF_BOUNDS;
+		return 0;
+	}
 	
 	return l->prev[idx] != 0;
 }
@@ -395,6 +415,11 @@ int listTail(list *l) {
 
 list_data_t listGet(list *l, int idx) {
 	assert(l);
+	
+	if (idx > l->capacity || idx <= 0) {
+		l->errno = LIST_INDEX_OUT_OF_BOUNDS;
+		return 0;
+	}
 	
 	return l->data[idx];
 }
@@ -446,6 +471,11 @@ int listSort(list *l) {
 
 int swap(list *l, int i, int j) {
 	assert(l);
+	
+	if (i > l->capacity || i <= 0 || j > l->capacity || j <= 0) {
+		l->errno = LIST_INDEX_OUT_OF_BOUNDS;
+		return -1;
+	}
 	
 	if (l->prev[i] == -1 && l->prev[j] == -1) {
 		return l->errno;
