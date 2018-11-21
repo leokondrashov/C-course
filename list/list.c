@@ -160,7 +160,7 @@ void plotGraph(list *l) {
 	fprintf(out, "\trankdir=LR;\n");
 	fprintf(out, "\te0 [color=grey, shape=box];\n");
 	for (int i = 1; i <= l->capacity; i++) {
-		fprintf(out, "\te%d [color=%s, shape=box, ", i, l->prev[i] == -1 ? "red" : "green");
+		fprintf(out, "\te%d [color=%s, shape=box", i, l->prev[i] == -1 ? "red" : "green");
 		if (i == l->head) {
 			fprintf(out, ", xlabel = \"head\"");
 		}

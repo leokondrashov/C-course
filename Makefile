@@ -41,7 +41,16 @@ textProcessor: Shakespeare/textProcessor.c
 	$(CC) -c -o $(ODIR)/textProcessor.o $(CFLAGS) Shakespeare/textProcessor.c
 
 list.o: list/list.c
-	$(CC) -g -c -o $(ODIR)/list.o $(CFLAGS) list/list.c
+	$(CC) -g -c -o $(ODIR)/list.o $(CFLAGS) list/list.c -DNDEBUG
 
 list_test: list.o list/unittest.c
 	$(CC) -g -o $(BDIR)/list_test $(CFLAGS) list/unittest.c $(ODIR)/list.o
+
+tree.o: akinator/tree.c
+	$(CC) -g -c -o $(ODIR)/tree.o $(CFLAGS) akinator/tree.c -DNDEBUG
+
+tree_test: tree.o akinator/test.c
+	$(CC) -g -o $(BDIR)/tree_test $(CFLAGS) akinator/test.c $(ODIR)/tree.o
+
+akinator: akinator/akinator.c tree.o
+	$(CC) -g -o $(BDIR)/akinator $(CFLAGS) akinator/akinator.c $(ODIR)/tree.o

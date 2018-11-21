@@ -3,7 +3,7 @@
 #define LIST_H
 
 typedef struct list list;
-typedef int list_data_t;
+typedef struct l_node *list_data_t;
 
 enum listError {
 	LIST_NO_ERROR,
@@ -26,6 +26,11 @@ struct list {
 	unsigned int size;
 	int sorted;
 	int errno;
+};
+
+struct l_node {
+	char *key;
+	int val;
 };
 
 int listCtor(list *l, unsigned int capacity);
