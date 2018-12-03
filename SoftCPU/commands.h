@@ -185,3 +185,7 @@ DEF_CMD(RET, 24, 0, {
 DEF_CMD(DUMP, 25, 0, {
 	CPUDump(cpu);
 })
+DEF_CMD(MEOW,
+26, 0, {
+printf(">^..^<\n");
+})

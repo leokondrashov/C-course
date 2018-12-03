@@ -3,6 +3,10 @@
 */
 
 #include <stack.h>
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define START_SIZE 10
 
@@ -214,7 +218,7 @@ int stackOk(stack *s) {
 	
 	if (s->errno != STACK_NO_ERROR) return 0;
 	
-	if (s->data == NULL || s->capacity == 0 || s->size <= s->capacity)
+	if (s->data == NULL || s->capacity == 0 || s->size >= s->capacity)
 		return 0;
 	
 	return 1;

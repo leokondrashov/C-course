@@ -1,4 +1,10 @@
 #include <textProcessor.h>
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <ctype.h>
 
 /*!
 *file reader
@@ -233,4 +239,13 @@ int strCompFromEnd(const char *first, const char *second) {
 	}
 	
 	return tolower(first[i]) - tolower(second[j]);
+}
+
+char *skipSpaces(const char *ptr) {
+	assert(ptr);
+	
+	while (isspace(*ptr))
+		ptr++;
+	
+	return ptr;
 }
