@@ -135,7 +135,22 @@ DEF_CMD(JA, 19, 1, {
 	if (arg2 > arg1)
 		cpu->ip = addr;
 })
-DEF_CMD(JB, 20, 1, {
+DEF_CMD(JAE,
+20, 1, {
+GET(addr);
+if (addr >= cpu->programSize) {
+cpu->
+errno = CPU_IP_OUT_OF_PROG;
+return 0;
+}
+arg1 = POP_;
+arg2 = POP_;
+if (arg2 >= arg1)
+cpu->
+ip = addr;
+})
+DEF_CMD(JB,
+21, 1, {
 	GET(addr);
 	if (addr >= cpu->programSize) {
 		cpu->errno = CPU_IP_OUT_OF_PROG;
@@ -146,7 +161,22 @@ DEF_CMD(JB, 20, 1, {
 	if (arg2 < arg1)
 	cpu->ip = addr;
 })
-DEF_CMD(JE, 21, 1, {
+DEF_CMD(JBE,
+22, 1, {
+GET(addr);
+if (addr >= cpu->programSize) {
+cpu->
+errno = CPU_IP_OUT_OF_PROG;
+return 0;
+}
+arg1 = POP_;
+arg2 = POP_;
+if (arg2 <= arg1)
+cpu->
+ip = addr;
+})
+DEF_CMD(JE,
+23, 1, {
 	GET(addr);
 	if (addr >= cpu->programSize) {
 		cpu->errno = CPU_IP_OUT_OF_PROG;
@@ -157,7 +187,8 @@ DEF_CMD(JE, 21, 1, {
 	if (arg2 == arg1)
 	cpu->ip = addr;
 })
-DEF_CMD(JNE, 22, 1, {
+DEF_CMD(JNE,
+24, 1, {
 	GET(addr);
 	if (addr >= cpu->programSize) {
 		cpu->errno = CPU_IP_OUT_OF_PROG;
@@ -169,7 +200,8 @@ DEF_CMD(JNE, 22, 1, {
 	cpu->ip = addr;
 })
 
-DEF_CMD(CALL, 23, 1, {
+DEF_CMD(CALL,
+25, 1, {
 	GET(addr);
 	if (addr >= cpu->programSize) {
 		cpu->errno = CPU_IP_OUT_OF_PROG;
@@ -178,14 +210,16 @@ DEF_CMD(CALL, 23, 1, {
 	stackPush(&cpu->callStack, cpu->ip);
 	cpu->ip = addr;
 })
-DEF_CMD(RET, 24, 0, {
+DEF_CMD(RET,
+26, 0, {
 	cpu->ip = stackPop(&cpu->callStack);
 })
 
-DEF_CMD(DUMP, 25, 0, {
+DEF_CMD(DUMP,
+27, 0, {
 	CPUDump(cpu);
 })
 DEF_CMD(MEOW,
-26, 0, {
+28, 0, {
 printf(">^..^<\n");
 })

@@ -119,7 +119,13 @@ void printGraphNodeVal(t_node *node) {
 		Fprintf("VAR; \\\"%c\\\"", (char) node->val->val);
 		break;
 	case CONST:
-		Fprintf("CONST; %g", node->val->val);
+		Fprintf("CONST; %d", node->val->val);
+		break;
+	case FUNCTION:
+		Fprintf("FUNC; %d", node->val->val);
+		break;
+	case FUNCTION_DECLARATION:
+		Fprintf("FUNC_DECL; %d", node->val->val);
 		break;
 	default:
 		Fprintf("Unknown");
@@ -304,7 +310,7 @@ void tNodeDtor(t_node *node) {
 	node->parent = NULL;
 }
 
-t_node *createNode(char type, double val, t_node *left, t_node *right) {
+t_node *createNode(char type, int val, t_node *left, t_node *right) {
 	assert(type >= 0 && type < MAX_TOKEN_TYPE);
 	
 	t_node *node = (t_node *) calloc(1, sizeof(t_node));

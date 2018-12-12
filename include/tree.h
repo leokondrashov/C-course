@@ -17,6 +17,8 @@ enum tokenType {
 	OP = 0,
 	VAR = 1,
 	CONST = 2,
+	FUNCTION = 3,
+	FUNCTION_DECLARATION = 4,
 	MAX_TOKEN_TYPE
 };
 
@@ -35,7 +37,7 @@ struct t_node {
 
 struct token {
 	char type;
-	double val;
+	int val;
 };
 
 int treeCtor(tree *t);
@@ -63,7 +65,7 @@ void process(t_node *node, void (*operation)(t_node *node));
 
 void tNodeCtor(t_node *node, tree_data_t val);
 void tNodeDtor(t_node *node);
-t_node *createNode(char type, double val, t_node *left, t_node *right);
+t_node *createNode(char type, int val, t_node *left, t_node *right);
 
 tree_data_t tNodeVal(t_node *node);
 t_node *tNodeLeft(t_node *node);

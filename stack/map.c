@@ -46,11 +46,11 @@ void mapDtor(map *m) {
  * @brief recursively frees nodes starting with node till the NULL pointer to next node
  * @param node
  */
-void freeNodes(struct m_node *node) {
+void mFreeNodes(struct m_node *node) {
 	if (node == NULL)
 		return;
 	
-	freeNodes(node->next);
+	mFreeNodes(node->next);
 	mNodeDtor(node);
 }
 

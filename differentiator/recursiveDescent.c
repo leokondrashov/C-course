@@ -29,7 +29,7 @@ char *s = NULL;
 //	t.root = root;
 //	if (error == 0)
 //		treeDump(&t);
-//	freeNodes(root);
+//	mFreeNodes(root);
 //	free(buff);
 //}
 

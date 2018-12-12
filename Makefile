@@ -60,3 +60,6 @@ differentiator: differentiator/differentiator.c tree.o textProcessor.o recursive
 
 recursiveDescent.o: differentiator/recursiveDescent.c tree.o
 	$(CC) -g -c -o $(ODIR)/recursiveDescent.o $(CFLAGS) differentiator/recursiveDescent.c -lm
+
+compiler: language/compiler.c tree.o textProcessor.o map.o
+	$(CC) -g -o $(BDIR)/compiler $(CFLAGS) language/compiler.c $(ODIR)/textProcessor.o $(ODIR)/tree.o $(ODIR)/map.o
