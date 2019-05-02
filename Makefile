@@ -25,11 +25,15 @@ stack_dbg: stack/stack.c
 stack_utest: stack_dbg stack/unittest.c
 	$(CC) -o $(BDIR)/stack_utest $(CFLAGS) stack/unittest.c $(ODIR)/stack_dbg.o
 
-map.o: stack/map.c
-	$(CC) -c -o $(ODIR)/map.o $(CFLAGS) stack/map.c -DNDEBUG
+map.o: list.o list/map.c
+	$(CC) -pg -c -o $(ODIR)/map.o $(CFLAGS) list/map.c -DNDEBUG
+
+map_test: map.o textProcessor.o list/maptest.c
+	as -o $(ODIR)/listFind.o list/listFind.s
+	$(CC) -pg -o $(BDIR)/map_test $(CFLAGS) list/maptest.c $(ODIR)/list.o $(ODIR)/map.o $(ODIR)/textProcessor.o
 
 asm: textProcessor.o SoftCPU/asm.c map.o
-	$(CC) -g -o $(BDIR)/asm $(CFLAGS) SoftCPU/asm.c $(ODIR)/textProcessor.o $(ODIR)/map.o
+	$(CC) -g -o $(BDIR)/asm $(CFLAGS) SoftCPU/asm.c $(ODIR)/textProcessor.o $(ODIR)/map.o $(ODIR)/list.o
 
 disasm: textProcessor.o SoftCPU/disasm.c
 	$(CC) -o $(BDIR)/disasm $(CFLAGS) SoftCPU/disasm.c $(ODIR)/textProcessor.o
@@ -38,10 +42,10 @@ CPU: stack.o textProcessor.o SoftCPU/CPU.c
 	$(CC) -g -o $(BDIR)/CPU $(CFLAGS) SoftCPU/CPU.c $(ODIR)/textProcessor.o $(ODIR)/stack.o -lm
 
 textProcessor.o: Shakespeare/textProcessor.c
-	$(CC) -c -o $(ODIR)/textProcessor.o $(CFLAGS) Shakespeare/textProcessor.c
+	$(CC) -pg -c -o $(ODIR)/textProcessor.o $(CFLAGS) Shakespeare/textProcessor.c
 
 list.o: list/list.c
-	$(CC) -g -c -o $(ODIR)/list.o $(CFLAGS) list/list.c -DNDEBUG
+	$(CC) -pg -c -o $(ODIR)/list.o $(CFLAGS) list/list.c -DNDEBUG
 
 list_test: list.o list/unittest.c
 	$(CC) -g -o $(BDIR)/list_test $(CFLAGS) list/unittest.c $(ODIR)/list.o

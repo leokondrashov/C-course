@@ -2,24 +2,22 @@
 
 #define MAP_H
 
+#include <list.h>
+#define HASH_SIZE 256
+
 typedef struct map map;
 
 enum mapError {
 	MAP_NO_ERROR,
 	MAP_ALLOCATION_ERROR,
+	MAP_LiST_ERROR,
 	MAP_NO_SUCH_ELEMENT
 };
 
 struct map {
-	struct m_node *head;
+	list table[HASH_SIZE];
 	unsigned int size;
 	int errno;
-};
-
-struct m_node {
-	struct m_node *next;
-	char *key;
-	int val;
 };
 
 int mapCtor(map *m);
@@ -28,23 +26,18 @@ void mapDtor(map *m);
 int mapOk(map *m);
 
 void mapDump(map *m);
+void printDistribution(map *m);
 
-int mapAdd(map *m, const char *key, int val);
-int mapGet(map *m, const char *key);
-int mapRemove(map *m, const char *key);
-int mapFind(map *m, const char *key);
+int mapAdd(map *m, m_key_t key, val_t val);
+val_t mapGet(map *m, m_key_t key);
+int mapRemove(map *m, m_key_t key);
 
 unsigned int mapSize(map *m);
 int mapErrno(map *m);
 void mapResetErrno(map *m);
 
-struct m_node *mapBegin(map *m);
-struct m_node *mapEnd(map *m);
+unsigned int hash(const char *key);
 
-int mNodeCtor(struct m_node *node, const char *key, int val);
-void mNodeDtor(struct m_node *node);
-struct m_node *mNodeNext(struct m_node *node);
-char *mNodeKey(struct m_node *node);
-int mNodeVal(struct m_node *node);
+void mapIterate(map *m, void func(struct l_node *node));
 
 #endif

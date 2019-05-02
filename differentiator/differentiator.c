@@ -337,8 +337,8 @@ int simplify(const t_node *root, t_node *node) {
 		node->val->val = L->val->val;
 		
 		freeNodes(R);
-		L = L->left;
-		R = L->right;
+		L = tmp->left;
+		R = tmp->right;
 		tmp->left = NULL;
 		tmp->right = NULL;
 		freeNodes(tmp);

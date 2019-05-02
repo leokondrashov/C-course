@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 int listCtor(list *l, unsigned int capacity) {
 	assert(l);
@@ -46,6 +47,12 @@ void listDtor(list *l) {
 	assert(l->next);
 	assert(l->prev);
 	
+	for (int i = 0; i < l->capacity; i++) {
+		if (l->data[i] != NULL) {
+			free(l->data[i]->key);
+			free(l->data[i]);
+		}
+	}
 	free(l->data);
 	l->data = NULL;
 	free(l->next);
@@ -199,7 +206,8 @@ void listDump(list *l) {
 	printf("\tcapacity = %d\n", l->capacity);
 	printf("\tdata {\n");
 	for (int i = 0; i <= l->capacity; i++) {
-		printf("\t%d: %d, %d, %d\n", i, l->data[i], l->next[i], l->prev[i]);
+		if (l->data[i] != NULL && l->data[i]->key != NULL)
+			printf("\t%d: {%s, %d}, %d, %d\n", i, l->data[i]->key, l->data[i]->val, l->next[i], l->prev[i]);
 	}
 	printf("\t}\n");
 	printf("\tsorted = %d\n", l->sorted);
@@ -290,7 +298,9 @@ int listRemove(list *l, int idx) {
 	}
 	
 	if (l->size == 1) {
-		l->data[l->head] = 0;
+//		free(l->data[idx]->key);
+		free(l->data[idx]);
+		l->data[idx] = NULL;
 		l->next[l->head] = l->free;
 		l->prev[l->head] = -1;
 		
@@ -306,8 +316,10 @@ int listRemove(list *l, int idx) {
 	if (idx == l->head) {
 		l->head = l->next[l->head];
 		l->prev[l->head] = 0;
-		
-		l->data[idx] = 0;
+
+//		free(l->data[idx]->key);
+		free(l->data[idx]);
+		l->data[idx] = NULL;
 		l->next[idx] = l->free;
 		l->prev[idx] = -1;
 		l->free = idx;
@@ -320,8 +332,10 @@ int listRemove(list *l, int idx) {
 	if (idx == l->tail) {
 		l->tail = l->prev[l->tail];
 		l->next[l->tail] = 0;
-		
-		l->data[idx] = 0;
+
+//		free(l->data[idx]->key);
+		free(l->data[idx]);
+		l->data[idx] = NULL;
 		l->next[idx] = l->free;
 		l->prev[idx] = -1;
 		l->free = idx;
@@ -344,16 +358,16 @@ int listRemove(list *l, int idx) {
 	return l->errno;
 }
 
-int listFindVerySlow(list *l, list_data_t el) {
+int listFindVerySlow(list *l, const char *key) {
 	assert(l);
-	
+
 	int it = l->head;
-	do {
-		if (el == l->data[it])
+	while (it != 0) {
+		if (strcmp(key, l->data[it]->key) == 0)
 			return it;
 		it = l->next[it];
-	} while (it != 0);
-	
+	}
+
 	return 0;
 }
 
@@ -448,7 +462,7 @@ int listSort(list *l) {
 	int it = l->head, n = 1;
 	while (it != 0) {
 		if (it != n) {
-			swap(l, it, n);
+			listSwap(l, it, n);
 		}
 		it = l->next[n];
 		n++;
@@ -469,7 +483,7 @@ int listSort(list *l) {
 	return l->errno;
 }
 
-int swap(list *l, int i, int j) {
+int listSwap(list *l, int i, int j) {
 	assert(l);
 	
 	if (i > l->capacity || i <= 0 || j > l->capacity || j <= 0) {
@@ -657,4 +671,13 @@ int listResize(list *l, unsigned int size) {
 	l->capacity = size;
 	
 	return l->errno;
+}
+
+void listIterate(list *l, void func(struct l_node *node)) {
+	assert(l);
+	assert(func);
+	
+	for (int it = l->head; it != 0; it = l->next[it]) {
+		func(l->data[it]);
+	}
 }

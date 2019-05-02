@@ -9,8 +9,8 @@
 
 #define sassert(expr) \
 if (!(expr)) { \
-    printf("unexpected symbol \'%c\' on line %d\n", *s, curLine + 1); \
-    error = 1; \
+    printf("unexpected symbol \'%c\' on line %d\n", *S, CurLine + 1); \
+    Error = 1; \
 }
 
 map functions;
@@ -19,44 +19,72 @@ t_node *getProg(const char *file);
 int treeToAsm(t_node *root, char *file);
 
 int main(int argc, char *argv[]) {
-	if (argc < 3) {
-		printf("I need source and output files\n");
+	if (argc < 2) {
+		printf("missing file\n");
+		printf("using format: compiler file [-o output_file]\n");
 		return 0;
+	}
+	
+	char *infile = NULL, *outfile = NULL;
+	for (int i = 1; i < argc; i++) {
+		if (argv[i][0] == '-') {
+			if (argv[i][1] == 'o' && outfile == NULL) {
+				outfile = argv[++i];
+			} else {
+				printf("Unknown flag: %s", argv[i]);
+				return 0;
+			}
+		} else if (infile == NULL) {
+			infile = argv[i];
+		} else {
+			printf("using format: compiler file [-o output_file]\n");
+			return 0;
+		}
+	}
+	
+	if (infile == NULL) {
+		printf("missing file\n");
+		printf("using format: asm file [-l listing_file] [-o output_file]\n");
+		return 0;
+	}
+	
+	if (outfile == NULL) {
+		outfile = "a.out";
 	}
 	
 	mapCtor(&functions);
 	
 	tree t = {};
 	treeCtor(&t);
-	t.root = getProg(argv[1]);
+	t.root = getProg(infile);
 	treeDump(&t);
 	
-	treeToAsm(t.root, argv[2]);
+	treeToAsm(t.root, outfile);
 	
 	treeDtor(&t);
 
 //	mapDtor(&functions);
 }
 
-char **lines = NULL;
-char *s = NULL;
-int curLine = 0, linesCount = 0;
-int error = 0;
+char **Lines = NULL;
+char *S = NULL;
+int CurLine = 0, LinesCount = 0;
+int Error = 0;
 
 void incrementPointer() {
-	s++;
+	S++;
 	
-	while (isspace(*s) || (*s == '\0' && curLine < linesCount - 1)) {
-		s = skipSpaces(s);
+	while (isspace(*S) || (*S == '\0' && CurLine < LinesCount - 1)) {
+		S = skipSpaces(S);
 		
-		if (*s == '\0' && curLine != linesCount - 1) {
-			curLine++;
-			s = lines[curLine];
+		if (*S == '\0' && CurLine != LinesCount - 1) {
+			CurLine++;
+			S = Lines[CurLine];
 		}
 	}
 }
 
-int functionCount = 0;
+int FunctionCount = 0;
 
 t_node *getG();
 t_node *getOPBlock();
@@ -81,18 +109,18 @@ t_node *getReturn();
 t_node *getProg(const char *file) {
 	assert(file);
 	
-	lines = readTextFromFile(file);
-	linesCount = countLines(lines);
+	Lines = readTextFromFile(file);
+	LinesCount = countLines(Lines);
 	
-	s = lines[0] - 1; // done to skip blank lines and space characters
+	S = Lines[0] - 1; // done to skip blank lines and space characters
 	incrementPointer();
 	
 	t_node *root = getG();
 	
-	free(lines[0]);
-	free(lines);
+	free(Lines[0]);
+	free(Lines);
 	
-	if (error) {
+	if (Error) {
 		freeNodes(root);
 		return NULL;
 	}
@@ -102,49 +130,49 @@ t_node *getProg(const char *file) {
 
 t_node *getG() {
 	t_node *val = NULL;
-	while (*s == 'f') {
+	while (*S == 'f') {
 		t_node *funcNode = getFunctionDeclaration();
 		val = createNode(OP, ';', val, funcNode);
 	}
 	val = createNode(OP, ';', val, createNode(OP, '0', NULL, getOPBlock()));
-	sassert(*s == '\0');
+	sassert(*S == '\0');
 	return val;
 }
 
 t_node *getFunctionDeclaration() {
 	if (isNextWord("function")) {
-		s += strlen("function") - 1;
+		S += strlen("function") - 1;
 		incrementPointer();
 		
 		size_t len = getWordLength();
-		char savedChar = s[len];
-		s[len] = '\0';
-		if (mapFind(&functions, s)) {
-			printf("redeclaration of function %s on line %d\n", s, curLine);
-			s[len] = savedChar;
-			s += len - 1;
+		char savedChar = S[len];
+		S[len] = '\0';
+		if (mapFind(&functions, S)) {
+			printf("redeclaration of function %s on line %d\n", S, CurLine);
+			S[len] = savedChar;
+			S += len - 1;
 			incrementPointer();
-			sassert(*s == '(');
+			sassert(*S == '(');
 			incrementPointer();
 			
-			sassert(*s == ')');
+			sassert(*S == ')');
 			incrementPointer();
 			
 			freeNodes(getOPBlock());
 			return NULL;
 		}
 		
-		mapAdd(&functions, s, functionCount);
-		s[len] = savedChar;
-		s += len - 1;
+		mapAdd(&functions, S, FunctionCount);
+		S[len] = savedChar;
+		S += len - 1;
 		incrementPointer();
-		sassert(*s == '(');
-		incrementPointer();
-		
-		sassert(*s == ')');
+		sassert(*S == '(');
 		incrementPointer();
 		
-		return createNode(FUNCTION_DECLARATION, functionCount++, NULL,
+		sassert(*S == ')');
+		incrementPointer();
+		
+		return createNode(FUNCTION_DECLARATION, FunctionCount++, NULL,
 				createNode(OP, ';', getOPBlock(), createNode(OP, 'r', NULL, NULL)));
 	}
 	
@@ -152,19 +180,19 @@ t_node *getFunctionDeclaration() {
 }
 
 t_node *getOPBlock() {
-	if (*s == '{') {
+	if (*S == '{') {
 		incrementPointer();
 		
-		char *oldS = s;
+		char *oldS = S;
 		t_node *val = getOP();
-		while (oldS != s && *s != '}') {
-			oldS = s;
+		while (oldS != S && *S != '}') {
+			oldS = S;
 			
 			t_node *opNode = getOP();
-			if (oldS != s)
+			if (oldS != S)
 				val = createNode(OP, ';', val, opNode);
 		}
-		sassert(*s == '}');
+		sassert(*S == '}');
 		incrementPointer();
 		return val;
 	}
@@ -187,44 +215,44 @@ t_node *getOP() {
 		return getAssignment();
 	if (val->val->type == FUNCTION)
 		val = createNode(OP, ';', val, createNode(OP, 'p', NULL, NULL)); // to get rid of returning value
-	sassert(*s == ';');
+	sassert(*S == ';');
 	incrementPointer();
 	return val;
 }
 
 t_node *getReturn() {
 	sassert(isNextWord("return"));
-	s += 5;
+	S += 5;
 	incrementPointer();
 	
-	if (*s == ';') {
+	if (*S == ';') {
 		incrementPointer();
 		return createNode(OP, 'r', NULL, NULL);
 	}
 	
 	t_node *val = createNode(OP, 'r', NULL, getE());
-	sassert(*s == ';');
+	sassert(*S == ';');
 	incrementPointer();
 	return val;
 }
 
 t_node *getIf() {
 	sassert(isNextWord("if"));
-	s++;
+	S++;
 	incrementPointer();
 	
-	sassert(*s == '(');
+	sassert(*S == '(');
 	incrementPointer();
 	
 	t_node *condition = getExpression();
 	
-	sassert(*s == ')');
+	sassert(*S == ')');
 	incrementPointer();
 	
 	t_node *operation = getOPBlock();
 	
 	if (isNextWord("else")) {
-		s += 3;
+		S += 3;
 		incrementPointer();
 		operation = createNode(OP, '|', operation, getOPBlock());
 	}
@@ -234,15 +262,15 @@ t_node *getIf() {
 
 t_node *getWhile() {
 	sassert(isNextWord("while"));
-	s += 4;
+	S += 4;
 	incrementPointer();
 	
-	sassert(*s == '(');
+	sassert(*S == '(');
 	incrementPointer();
 	
 	t_node *condition = getExpression();
 	
-	sassert(*s == ')');
+	sassert(*S == ')');
 	incrementPointer();
 	
 	t_node *operation = getOPBlock();
@@ -251,18 +279,18 @@ t_node *getWhile() {
 }
 
 t_node *getAssignment() {
-	char *oldS = s;
+	char *oldS = S;
 	
 	t_node *id = getId();
-	if (oldS == s)
+	if (oldS == S)
 		return NULL;
 	
-	sassert(*s == '=');
+	sassert(*S == '=');
 	incrementPointer();
 	
 	t_node *expr = getE();
 	
-	sassert(*s == ';');
+	sassert(*S == ';');
 	incrementPointer();
 	
 	return createNode(OP, '=', id, expr);
@@ -284,10 +312,10 @@ t_node *getExpression() {
 }
 
 t_node *getComparison() {
-	switch (*s) {
+	switch (*S) {
 	case '>':
-		if (*(s + 1) == '=') {
-			s++;
+		if (*(S + 1) == '=') {
+			S++;
 			incrementPointer();
 			return createNode(OP, 'g', NULL, NULL);
 		}
@@ -295,8 +323,8 @@ t_node *getComparison() {
 		incrementPointer();
 		return createNode(OP, 'G', NULL, NULL);
 	case '<':
-		if (*(s + 1) == '=') {
-			s++;
+		if (*(S + 1) == '=') {
+			S++;
 			incrementPointer();
 			return createNode(OP, 'l', NULL, NULL);
 		}
@@ -304,15 +332,15 @@ t_node *getComparison() {
 		incrementPointer();
 		return createNode(OP, 'L', NULL, NULL);
 	case '=':
-		if (*(s + 1) == '=') {
-			s++;
+		if (*(S + 1) == '=') {
+			S++;
 			incrementPointer();
 			return createNode(OP, 'e', NULL, NULL);
 		}
 		return NULL;
 	case '!':
-		if (*(s + 1) == '=') {
-			s++;
+		if (*(S + 1) == '=') {
+			S++;
 			incrementPointer();
 			return createNode(OP, 'n', NULL, NULL);
 		}
@@ -326,8 +354,8 @@ t_node *getComparison() {
 t_node *getE() {
 	t_node *val = getT();
 	
-	while (*s == '+' || *s == '-') {
-		int op = *s;
+	while (*S == '+' || *S == '-') {
+		int op = *S;
 		incrementPointer();
 		t_node *opNode = createNode(OP, op, val, getT());
 		
@@ -340,8 +368,8 @@ t_node *getE() {
 t_node *getT() {
 	t_node *val = getP();
 	
-	while (*s == '*' || *s == '/') {
-		int op = *s;
+	while (*S == '*' || *S == '/') {
+		int op = *S;
 		incrementPointer();
 		t_node *opNode = createNode(OP, op, val, getP());
 		
@@ -354,15 +382,15 @@ t_node *getT() {
 t_node *getP() {
 	t_node *val = NULL;
 	
-	if (*s == '(') {
+	if (*S == '(') {
 		incrementPointer();
 		val = getE();
-		sassert(*s == ')');
+		sassert(*S == ')');
 		incrementPointer();
 		return val;
 	}
 	
-	if (isdigit(*s) || *s == '+' || *s == '-')
+	if (isdigit(*S) || *S == '+' || *S == '-')
 		return getN();
 	
 	val = getFunctionCall();
@@ -373,86 +401,86 @@ t_node *getP() {
 }
 
 t_node *getN() {
-	sassert(isdigit(*s) || ((*s == '+' || *s == '-') && isdigit(*(s + 1))));
+	sassert(isdigit(*S) || ((*S == '+' || *S == '-') && isdigit(*(S + 1))));
 	
 	int constVal = 0, nextPos = 0;
-	sscanf(s, "%d%n", &constVal, &nextPos);
+	sscanf(S, "%d%n", &constVal, &nextPos);
 	if (nextPos == 0)
 		return NULL;
 	
-	s += nextPos - 1;
+	S += nextPos - 1;
 	incrementPointer();
 	return createNode(CONST, constVal, NULL, NULL);
 }
 
 t_node *getId() {
-	sassert(*s >= 'a' && *s <= 'o');
+	sassert(*S >= 'a' && *S <= 'o');
 	
-	if (*s < 'a' || *s > 'o')
+	if (*S < 'a' || *S > 'o')
 		return NULL;
 	
-	t_node *val = createNode(VAR, *s, NULL, NULL);
+	t_node *val = createNode(VAR, *S, NULL, NULL);
 	incrementPointer();
 	return val;
 }
 
 t_node *getFunctionCall() {
 	if (isNextWord("in")) {
-		s++;
+		S++;
 		incrementPointer();
 		
-		sassert(*s == '(');
+		sassert(*S == '(');
 		incrementPointer();
 		
-		sassert(*s == ')');
+		sassert(*S == ')');
 		incrementPointer();
 		
 		return createNode(OP, 'I', NULL, NULL);
 	} else if (isNextWord("out")) {
-		s += 2;
+		S += 2;
 		incrementPointer();
 		
-		sassert(*s == '(');
+		sassert(*S == '(');
 		incrementPointer();
 		
 		t_node *arg = getE();
 		
-		sassert(*s == ')');
+		sassert(*S == ')');
 		incrementPointer();
 		
 		return createNode(OP, 'O', NULL, arg);
 	} else if (isNextWord("sqrt")) {
-		s += 3;
+		S += 3;
 		incrementPointer();
 		
-		sassert(*s == '(');
+		sassert(*S == '(');
 		incrementPointer();
 		
 		t_node *arg = getE();
 		
-		sassert(*s == ')');
+		sassert(*S == ')');
 		incrementPointer();
 		
 		return createNode(OP, 's', NULL, arg);
 	} else if (isNextWord("meow")) {
-		s += 3;
+		S += 3;
 		incrementPointer();
 		
-		sassert(*s == '(');
+		sassert(*S == '(');
 		incrementPointer();
 		
-		sassert(*s == ')');
+		sassert(*S == ')');
 		incrementPointer();
 		
 		return createNode(OP, 'm', NULL, NULL);
 	} else if (isNextWord("dump")) {
-		s += 3;
+		S += 3;
 		incrementPointer();
 		
-		sassert(*s == '(');
+		sassert(*S == '(');
 		incrementPointer();
 		
-		sassert(*s == ')');
+		sassert(*S == ')');
 		incrementPointer();
 		
 		return createNode(OP, 'd', NULL, NULL);
@@ -461,28 +489,28 @@ t_node *getFunctionCall() {
 		if (len == 0)
 			return NULL;
 		
-		char savedChar = s[len];
-		s[len] = '\0';
-		if (mapFind(&functions, s)) {
-			t_node *val = createNode(FUNCTION, mapGet(&functions, s), NULL, NULL);
-			s[len] = savedChar;
-			s += len - 1;
+		char savedChar = S[len];
+		S[len] = '\0';
+		if (mapFind(&functions, S)) {
+			t_node *val = createNode(FUNCTION, mapGet(&functions, S), NULL, NULL);
+			S[len] = savedChar;
+			S += len - 1;
 			incrementPointer();
 			
-			sassert(*s == '(');
+			sassert(*S == '(');
 			incrementPointer();
 			
-			if (*s != ')') {
+			if (*S != ')') {
 				t_node *args = getArgList();
 				val->right = args;
 			}
 			
-			sassert(*s == ')');
+			sassert(*S == ')');
 			incrementPointer();
 			return val;
 		}
 		
-		s[len] = savedChar;
+		S[len] = savedChar;
 		return NULL;
 	}
 }
@@ -490,7 +518,7 @@ t_node *getFunctionCall() {
 t_node *getArgList() {
 	t_node *args = getE();
 	
-	while (*s == ',') {
+	while (*S == ',') {
 		incrementPointer();
 		args = createNode(OP, ',', args, getE());
 	}
@@ -499,11 +527,11 @@ t_node *getArgList() {
 }
 
 size_t getWordLength() {
-	if (!isalpha(*s) && *s != '_')
+	if (!isalpha(*S) && *S != '_')
 		return 0;
 	
 	size_t len = 0;
-	while (isalnum(s[len]) || s[len] == '_')
+	while (isalnum(S[len]) || S[len] == '_')
 		len++;
 	
 	return len;
@@ -511,17 +539,17 @@ size_t getWordLength() {
 
 int isNextWord(const char *word) {
 	size_t len = getWordLength();
-	char savedChar = s[len];
-	s[len] = '\0';
+	char savedChar = S[len];
+	S[len] = '\0';
 	
-	int res = strcmp(s, word);
+	int res = strcmp(S, word);
 	
-	s[len] = savedChar;
+	S[len] = savedChar;
 	
 	return res == 0;
 }
 
-int ifCounter = 0, loopCounter = 0, argsCounter = 0;
+int IfCounter = 0, LoopCounter = 0, ArgsCounter = 0;
 
 int nodeToAsm(t_node *node, FILE *out) {
 	if (node == NULL)
@@ -539,12 +567,12 @@ int nodeToAsm(t_node *node, FILE *out) {
 			fprintf(out, "pushr r%d\n", i);
 		}
 		if (node->right != NULL) {
-			argsCounter = 1;
+			ArgsCounter = 1;
 			nodeToAsm(node->right, out);
-			for (int i = 0; i < argsCounter; i++) {
+			for (int i = 0; i < ArgsCounter; i++) {
 				fprintf(out, "popr r%d\n", i > 14 ? 15 : i);
 			}
-			for (int i = argsCounter; i < 15; i++) {
+			for (int i = ArgsCounter; i < 15; i++) {
 				fprintf(out, "push 0\n"
 							 "popr r%d\n", i);
 			}
@@ -563,7 +591,7 @@ int nodeToAsm(t_node *node, FILE *out) {
 	case OP:
 		switch ((char) node->val->val) {
 		case ',':
-			argsCounter++;
+			ArgsCounter++;
 			nodeToAsm(node->right, out);
 			nodeToAsm(node->left, out);
 			return 1;
@@ -610,7 +638,7 @@ int nodeToAsm(t_node *node, FILE *out) {
 		case 'i':
 			if (node->right->val->val != '|') {
 				nodeToAsm(node->left, out);
-				int counter = ifCounter;
+				int counter = IfCounter;
 				if (node->left->val->type != OP) {
 					fprintf(out, "push 0\n"
 								 "je if%d_end\n", counter);
@@ -639,13 +667,13 @@ int nodeToAsm(t_node *node, FILE *out) {
 									 "je if%d_end\n", counter);
 					}
 				}
-				ifCounter++;
+				IfCounter++;
 				nodeToAsm(node->right, out);
 				fprintf(out, "if%d_end:\n", counter);
 				return 1;
 			} else {
 				nodeToAsm(node->left, out);
-				int counter = ifCounter;
+				int counter = IfCounter;
 				if (node->left->val->type != OP) {
 					fprintf(out, "push 0\n"
 								 "je else%d\n", counter);
@@ -674,7 +702,7 @@ int nodeToAsm(t_node *node, FILE *out) {
 									 "je else%d\n", counter);
 					}
 				}
-				ifCounter++;
+				IfCounter++;
 				nodeToAsm(node->right->left, out);
 				fprintf(out, "jmp if%d_end\n"
 							 "else%d:\n", counter, counter);
@@ -683,8 +711,8 @@ int nodeToAsm(t_node *node, FILE *out) {
 				return 1;
 			}
 		case 'w':
-			fprintf(out, "loop%d:\n", loopCounter);
-			int counter = loopCounter;
+			fprintf(out, "loop%d:\n", LoopCounter);
+			int counter = LoopCounter;
 			nodeToAsm(node->left, out);
 			if (node->left->val->type != OP) {
 				fprintf(out, "push 0\n"
@@ -714,7 +742,7 @@ int nodeToAsm(t_node *node, FILE *out) {
 								 "je loop%d_end\n", counter);
 				}
 			}
-			loopCounter++;
+			LoopCounter++;
 			nodeToAsm(node->right, out);
 			fprintf(out, "jmp loop%d\n", counter);
 			fprintf(out, "loop%d_end:\n", counter);

@@ -10,12 +10,12 @@
 #define sassert(expr) \
 if (!(expr)) { \
     printf("unknown symbol %c\n", *s); \
-    error = 1; \
+    Error = 1; \
 }
 
 #define BUFF_SIZE 100
 
-int error = 0;
+int Error = 0;
 char *s = NULL;
 
 //int main() {
@@ -40,7 +40,7 @@ t_node *getG(char *str) {
 	t_node *val = getE();
 	sassert(*s == '\0');
 	s++;
-	if (error) {
+	if (Error) {
 		freeNodes(val);
 		val = NULL;
 	}

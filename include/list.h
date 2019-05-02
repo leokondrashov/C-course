@@ -4,6 +4,8 @@
 
 typedef struct list list;
 typedef struct l_node *list_data_t;
+typedef char *m_key_t;
+typedef int val_t;
 
 enum listError {
 	LIST_NO_ERROR,
@@ -29,8 +31,8 @@ struct list {
 };
 
 struct l_node {
-	char *key;
-	int val;
+	m_key_t key;
+	val_t val;
 };
 
 int listCtor(list *l, unsigned int capacity);
@@ -43,7 +45,7 @@ void listDump(list *l);
 int listInsert(list *l, int idx, list_data_t el);
 int listRemove(list *l, int idx);
 
-int listFindVerySlow(list *l, list_data_t el);
+int listFindVerySlow(list *l, const char *key);
 
 int listNext(list *l, int idx);
 int listHasNext(list *l, int idx);
@@ -61,8 +63,10 @@ void listResetErrno(list *l);
 unsigned int listSize(list *l);
 
 int listSort(list *l);
-int swap(list *l, int i, int j);
+int listSwap(list *l, int i, int j);
 
 int listResize(list *l, unsigned int size);
+
+void listIterate(list *l, void func(struct l_node *node));
 
 #endif

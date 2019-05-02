@@ -42,7 +42,7 @@ char **readTextFromFile(const char *file) {
 	return lines;
 }
 
-/*
+/*!
 *\brief routine returning size of file
 */
 
@@ -55,7 +55,7 @@ int sizeofFile(const char *file) {
 	return st.st_size;
 }
 
-/*
+/*!
 *\brief counts lines in array of strings
 */
 
@@ -68,7 +68,7 @@ int countLines(char **lines) {
 	return i;
 }
 
-/*
+/*!
 *\brief writes lines to file separated with \n
 */
 
@@ -84,7 +84,7 @@ void writeToFile(const char *file, const char **lines) {
 	fclose(out);
 }
 
-/*
+/*!
 *\brief counting char c in str
 */
 
@@ -241,7 +241,7 @@ int strCompFromEnd(const char *first, const char *second) {
 	return tolower(first[i]) - tolower(second[j]);
 }
 
-char *skipSpaces(const char *ptr) {
+const char *skipSpaces(const char *ptr) {
 	assert(ptr);
 	
 	while (isspace(*ptr))

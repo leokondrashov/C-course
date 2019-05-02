@@ -58,6 +58,12 @@ int main(int argc, char *argv[]) {
 	processSource(infile, lstfile, outfile);
 }
 
+FILE *lstFile = NULL;
+
+void writeLabel(struct l_node *node) {
+	fprintf(lstFile, "\t%s: %08x\n", node->key, node->val);
+}
+
 /*!
  * @brief write labels to listing file lst
  * @param lst
@@ -65,14 +71,12 @@ int main(int argc, char *argv[]) {
 void writeLabels(FILE *lst) {
 	assert(lst);
 	
-	struct m_node *cur = mapBegin(&labels);
-	if (cur == NULL)
-		return;
+	lstFile = lst;
+	
 	fprintf(lst, "labels:\n");
-	while (cur) {
-		fprintf(lst, "\t%s: %08x\n", mNodeKey(cur), mNodeVal(cur));
-		cur = mNodeNext(cur);
-	}
+	mapIterate(&labels, writeLabel);
+	
+	lstFile = NULL;
 }
 
 /*!
