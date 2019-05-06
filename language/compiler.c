@@ -6,14 +6,16 @@
 #include <assert.h>
 #include <string.h>
 #include <map.h>
+#include <stack.h>
+#include <threads.h>
 
 #define sassert(expr) \
 if (!(expr)) { \
-    printf("unexpected symbol \'%c\' on line %d\n", *S, CurLine + 1); \
+    printf("unexpected symbol \'%c\' on line %d(%s)\n", *S, CurLine + 1, __func__); \
     Error = 1; \
 }
 
-map functions;
+map Functions, Vars;
 
 t_node *getProg(const char *file);
 int treeToAsm(t_node *root, char *file);
@@ -52,7 +54,8 @@ int main(int argc, char *argv[]) {
 		outfile = "a.out";
 	}
 	
-	mapCtor(&functions);
+	mapCtor(&Functions);
+	mapCtor(&Vars);
 	
 	tree t = {};
 	treeCtor(&t);
@@ -62,8 +65,9 @@ int main(int argc, char *argv[]) {
 	treeToAsm(t.root, outfile);
 	
 	treeDtor(&t);
-
-//	mapDtor(&functions);
+	
+	mapDtor(&Functions);
+	mapDtor(&Vars);
 }
 
 char **Lines = NULL;
@@ -84,8 +88,6 @@ void incrementPointer() {
 	}
 }
 
-int FunctionCount = 0;
-
 t_node *getG();
 t_node *getOPBlock();
 t_node *getOP();
@@ -104,7 +106,13 @@ t_node *getArgList();
 size_t getWordLength();
 int isNextWord(const char *word);
 t_node *getFunctionDeclaration();
+t_node *getArgListDeclaration();
 t_node *getReturn();
+int getArgCount(t_node *node);
+
+int getVarCount(t_node *node);
+void addVars(t_node *node, stack *stk);
+void addArgs(t_node *node);
 
 t_node *getProg(const char *file) {
 	assert(file);
@@ -132,9 +140,9 @@ t_node *getG() {
 	t_node *val = NULL;
 	while (*S == 'f') {
 		t_node *funcNode = getFunctionDeclaration();
-		val = createNode(OP, ';', val, funcNode);
+		val = createNodeInt(OP, ';', val, funcNode);
 	}
-	val = createNode(OP, ';', val, createNode(OP, '0', NULL, getOPBlock()));
+	val = createNodeInt(OP, ';', val, createNodeInt(OP, '0', NULL, getOPBlock()));
 	sassert(*S == '\0');
 	return val;
 }
@@ -147,11 +155,19 @@ t_node *getFunctionDeclaration() {
 		size_t len = getWordLength();
 		char savedChar = S[len];
 		S[len] = '\0';
-		if (mapFind(&functions, S)) {
-			printf("redeclaration of function %s on line %d\n", S, CurLine);
-			S[len] = savedChar;
-			S += len - 1;
-			incrementPointer();
+		
+		char *funcName = calloc(len + 1, sizeof(char));
+		strcpy(funcName, S);
+		
+		S[len] = savedChar;
+		S += len - 1;
+		incrementPointer();
+		
+		mapResetErrno(&Functions);
+		mapGet(&Functions, funcName);
+		
+		if (mapErrno(&Functions) != MAP_NO_SUCH_ELEMENT) {
+			printf("redeclaration of function %s on line %d\n", funcName, CurLine);
 			sassert(*S == '(');
 			incrementPointer();
 			
@@ -159,24 +175,49 @@ t_node *getFunctionDeclaration() {
 			incrementPointer();
 			
 			freeNodes(getOPBlock());
+			free(funcName);
 			return NULL;
 		}
 		
-		mapAdd(&functions, S, FunctionCount);
-		S[len] = savedChar;
-		S += len - 1;
-		incrementPointer();
 		sassert(*S == '(');
 		incrementPointer();
+		
+		t_node *argList = NULL;
+		if (*S != ')') {
+			argList = getArgListDeclaration();
+		}
 		
 		sassert(*S == ')');
 		incrementPointer();
 		
-		return createNode(FUNCTION_DECLARATION, FunctionCount++, NULL,
-				createNode(OP, ';', getOPBlock(), createNode(OP, 'r', NULL, NULL)));
+		mapAdd(&Functions, funcName, getArgCount(argList));
+		
+		return createNodeStr(FUNCTION_DECLARATION, funcName, argList,
+				createNodeInt(OP, ';', getOPBlock(), createNodeInt(OP, 'r', NULL, NULL)));
 	}
 	
 	return NULL;
+}
+
+t_node *getArgListDeclaration() {
+	t_node *args = getId();
+	
+	while (*S == ',') {
+		incrementPointer();
+		args = createNodeInt(OP, ',', args, getId());
+	}
+	
+	return args;
+}
+
+int getArgCount(t_node *node) {
+	if (node == NULL)
+		return 0;
+	
+	if (node->val->type == OP && node->val->val.i == ',')
+		return getArgCount(node->left) + getArgCount(node->right);
+	
+	return 1;
 }
 
 t_node *getOPBlock() {
@@ -190,7 +231,7 @@ t_node *getOPBlock() {
 			
 			t_node *opNode = getOP();
 			if (oldS != S)
-				val = createNode(OP, ';', val, opNode);
+				val = createNodeInt(OP, ';', val, opNode);
 		}
 		sassert(*S == '}');
 		incrementPointer();
@@ -210,14 +251,14 @@ t_node *getOP() {
 	if (isNextWord("return"))
 		return getReturn();
 	
-	t_node *val = getFunctionCall();
-	if (val == NULL)
-		return getAssignment();
-	if (val->val->type == FUNCTION)
-		val = createNode(OP, ';', val, createNode(OP, 'p', NULL, NULL)); // to get rid of returning value
-	sassert(*S == ';');
-	incrementPointer();
-	return val;
+	if (S[getWordLength()] == '(') { //TODO right check for function call
+		t_node *func = createNodeInt(OP, ';', getFunctionCall(), createNodeInt(OP, 'p', NULL, NULL));
+		sassert(*S == ';');
+		incrementPointer();
+		return func;
+	}
+	
+	return getAssignment();
 }
 
 t_node *getReturn() {
@@ -227,10 +268,10 @@ t_node *getReturn() {
 	
 	if (*S == ';') {
 		incrementPointer();
-		return createNode(OP, 'r', NULL, NULL);
+		return createNodeInt(OP, 'r', NULL, NULL);
 	}
 	
-	t_node *val = createNode(OP, 'r', NULL, getE());
+	t_node *val = createNodeInt(OP, 'r', NULL, getE());
 	sassert(*S == ';');
 	incrementPointer();
 	return val;
@@ -254,10 +295,10 @@ t_node *getIf() {
 	if (isNextWord("else")) {
 		S += 3;
 		incrementPointer();
-		operation = createNode(OP, '|', operation, getOPBlock());
+		operation = createNodeInt(OP, '|', operation, getOPBlock());
 	}
 	
-	return createNode(OP, 'i', condition, operation);
+	return createNodeInt(OP, 'i', condition, operation);
 }
 
 t_node *getWhile() {
@@ -275,7 +316,7 @@ t_node *getWhile() {
 	
 	t_node *operation = getOPBlock();
 	
-	return createNode(OP, 'w', condition, operation);
+	return createNodeInt(OP, 'w', condition, operation);
 }
 
 t_node *getAssignment() {
@@ -293,7 +334,7 @@ t_node *getAssignment() {
 	sassert(*S == ';');
 	incrementPointer();
 	
-	return createNode(OP, '=', id, expr);
+	return createNodeInt(OP, '=', id, expr);
 }
 
 t_node *getExpression() {
@@ -317,32 +358,32 @@ t_node *getComparison() {
 		if (*(S + 1) == '=') {
 			S++;
 			incrementPointer();
-			return createNode(OP, 'g', NULL, NULL);
+			return createNodeInt(OP, 'g', NULL, NULL);
 		}
 		
 		incrementPointer();
-		return createNode(OP, 'G', NULL, NULL);
+		return createNodeInt(OP, 'G', NULL, NULL);
 	case '<':
 		if (*(S + 1) == '=') {
 			S++;
 			incrementPointer();
-			return createNode(OP, 'l', NULL, NULL);
+			return createNodeInt(OP, 'l', NULL, NULL);
 		}
 		
 		incrementPointer();
-		return createNode(OP, 'L', NULL, NULL);
+		return createNodeInt(OP, 'L', NULL, NULL);
 	case '=':
 		if (*(S + 1) == '=') {
 			S++;
 			incrementPointer();
-			return createNode(OP, 'e', NULL, NULL);
+			return createNodeInt(OP, 'e', NULL, NULL);
 		}
 		return NULL;
 	case '!':
 		if (*(S + 1) == '=') {
 			S++;
 			incrementPointer();
-			return createNode(OP, 'n', NULL, NULL);
+			return createNodeInt(OP, 'n', NULL, NULL);
 		}
 		return NULL;
 	
@@ -357,7 +398,7 @@ t_node *getE() {
 	while (*S == '+' || *S == '-') {
 		int op = *S;
 		incrementPointer();
-		t_node *opNode = createNode(OP, op, val, getT());
+		t_node *opNode = createNodeInt(OP, op, val, getT());
 		
 		val = opNode;
 	}
@@ -371,7 +412,7 @@ t_node *getT() {
 	while (*S == '*' || *S == '/') {
 		int op = *S;
 		incrementPointer();
-		t_node *opNode = createNode(OP, op, val, getP());
+		t_node *opNode = createNodeInt(OP, op, val, getP());
 		
 		val = opNode;
 	}
@@ -380,11 +421,9 @@ t_node *getT() {
 }
 
 t_node *getP() {
-	t_node *val = NULL;
-	
 	if (*S == '(') {
 		incrementPointer();
-		val = getE();
+		t_node *val = getE();
 		sassert(*S == ')');
 		incrementPointer();
 		return val;
@@ -393,9 +432,9 @@ t_node *getP() {
 	if (isdigit(*S) || *S == '+' || *S == '-')
 		return getN();
 	
-	val = getFunctionCall();
-	if (val != NULL)
-		return val;
+	if (S[getWordLength()] == '(') { //TODO right check for function call
+		return getFunctionCall();
+	}
 	
 	return getId();
 }
@@ -410,17 +449,25 @@ t_node *getN() {
 	
 	S += nextPos - 1;
 	incrementPointer();
-	return createNode(CONST, constVal, NULL, NULL);
+	return createNodeInt(CONST, constVal, NULL, NULL);
 }
 
 t_node *getId() {
-	sassert(*S >= 'a' && *S <= 'o');
+	size_t len = getWordLength();
 	
-	if (*S < 'a' || *S > 'o')
-		return NULL;
+	sassert(len != 0);
 	
-	t_node *val = createNode(VAR, *S, NULL, NULL);
+	char savedChar = S[len];
+	S[len] = '\0';
+	
+	char *varName = calloc(len + 1, sizeof(char));
+	strcpy(varName, S);
+	
+	S[len] = savedChar;
+	S += len - 1;
 	incrementPointer();
+	
+	t_node *val = createNodeStr(VAR, varName, NULL, NULL);
 	return val;
 }
 
@@ -435,7 +482,7 @@ t_node *getFunctionCall() {
 		sassert(*S == ')');
 		incrementPointer();
 		
-		return createNode(OP, 'I', NULL, NULL);
+		return createNodeInt(OP, 'I', NULL, NULL);
 	} else if (isNextWord("out")) {
 		S += 2;
 		incrementPointer();
@@ -448,52 +495,25 @@ t_node *getFunctionCall() {
 		sassert(*S == ')');
 		incrementPointer();
 		
-		return createNode(OP, 'O', NULL, arg);
-	} else if (isNextWord("sqrt")) {
-		S += 3;
-		incrementPointer();
-		
-		sassert(*S == '(');
-		incrementPointer();
-		
-		t_node *arg = getE();
-		
-		sassert(*S == ')');
-		incrementPointer();
-		
-		return createNode(OP, 's', NULL, arg);
-	} else if (isNextWord("meow")) {
-		S += 3;
-		incrementPointer();
-		
-		sassert(*S == '(');
-		incrementPointer();
-		
-		sassert(*S == ')');
-		incrementPointer();
-		
-		return createNode(OP, 'm', NULL, NULL);
-	} else if (isNextWord("dump")) {
-		S += 3;
-		incrementPointer();
-		
-		sassert(*S == '(');
-		incrementPointer();
-		
-		sassert(*S == ')');
-		incrementPointer();
-		
-		return createNode(OP, 'd', NULL, NULL);
+		return createNodeInt(OP, 'O', NULL, arg);
 	} else {
+		
 		size_t len = getWordLength();
 		if (len == 0)
 			return NULL;
 		
 		char savedChar = S[len];
 		S[len] = '\0';
-		if (mapFind(&functions, S)) {
-			t_node *val = createNode(FUNCTION, mapGet(&functions, S), NULL, NULL);
-			S[len] = savedChar;
+		
+		char *funcName = calloc(len + 1, sizeof(char));
+		strcpy(funcName, S);
+		S[len] = savedChar;
+		
+		mapResetErrno(&Functions);
+		int argNum = mapGet(&Functions, funcName);
+		
+		if (mapErrno(&Functions) != MAP_NO_SUCH_ELEMENT) {
+			t_node *val = createNodeStr(FUNCTION, funcName, NULL, NULL);
 			S += len - 1;
 			incrementPointer();
 			
@@ -502,15 +522,44 @@ t_node *getFunctionCall() {
 			
 			if (*S != ')') {
 				t_node *args = getArgList();
+				if (getArgCount(args) != argNum) {
+					printf("wrong args count on line %d: expected %d, got %d\n", CurLine, argNum, getArgCount(args));
+					Error = 1;
+					
+					sassert(*S == ')');
+					incrementPointer();
+					
+					freeNodes(args);
+					freeNodes(val);
+					return NULL;
+				}
 				val->right = args;
+			} else if (argNum != 0) {
+				printf("wrong args count on line %d: expected %d, got %d\n", CurLine, argNum, 0);
+				Error = 1;
+				
+				sassert(*S == ')');
+				incrementPointer();
+				
+				freeNodes(val);
+				return NULL;
 			}
 			
 			sassert(*S == ')');
 			incrementPointer();
 			return val;
 		}
+		printf("unknown function %s on line %d\n", funcName, CurLine);
+		Error = 1;
+		S += len - 1;
+		incrementPointer();
+		incrementPointer(); // '('
 		
-		S[len] = savedChar;
+		freeNodes(getArgList());
+		
+		incrementPointer(); // ')'
+		
+		free(funcName);
 		return NULL;
 	}
 }
@@ -520,10 +569,118 @@ t_node *getArgList() {
 	
 	while (*S == ',') {
 		incrementPointer();
-		args = createNode(OP, ',', args, getE());
+		args = createNodeInt(OP, ',', args, getE());
 	}
 	
 	return args;
+}
+
+int getVarCount(t_node *node) {
+	static int count = 0;
+	static int maxChildrenCount = 0;
+	static stack *stk = NULL;
+	
+	char stkCreator = 0;
+	
+	if (node == NULL)
+		return 0;
+	
+	if (stk == NULL) {
+		stkCreator = 1;
+		stk = calloc(1, sizeof(stack));
+		stackCtor(stk);
+	}
+	
+	if (node->val->type == OP && (node->val->val.i == 'i' || node->val->val.i == 'w')) {
+		int countSaved = count;
+		count = 0;
+		int maxChildrenCountSaved = maxChildrenCount;
+		maxChildrenCount = 0;
+		stack *stkSaved = stk;
+		stk = NULL;
+		
+		if (node->right->val->type == OP && node->right->val->val.i == '|') {
+			int childrenCount = getVarCount(node->right->left);
+			maxChildrenCountSaved = (childrenCount > maxChildrenCountSaved) ? (childrenCount) : (maxChildrenCountSaved);
+			
+			count = 0;
+			maxChildrenCount = 0;
+			
+			childrenCount = getVarCount(node->right->right);
+			maxChildrenCount = (childrenCount > maxChildrenCountSaved) ? (childrenCount) : (maxChildrenCountSaved);
+		} else {
+			int childrenCount = getVarCount(node->right);
+			maxChildrenCount = (childrenCount > maxChildrenCountSaved) ? (childrenCount) : (maxChildrenCountSaved);
+		}
+		
+		count = countSaved;
+		maxChildrenCount = maxChildrenCountSaved;
+		stk = stkSaved;
+	} else if (node->val->type == OP && node->val->val.i == '=') {
+		mapResetErrno(&Vars);
+		mapGet(&Vars, node->left->val->val.s);
+		if (mapErrno(&Vars) == MAP_NO_SUCH_ELEMENT) {
+			mapAdd(&Vars, node->left->val->val.s, 0);
+			stackPush(stk, node->left->val->val.s);
+			count++;
+		}
+	} else {
+		getVarCount(node->left);
+		getVarCount(node->right);
+	}
+	
+	if (stkCreator) {
+		while (stackSize(stk)) {
+			mapRemove(&Vars, stackPop(stk));
+		}
+		stackDtor(stk);
+		free(stk);
+		stk = NULL;
+	}
+	
+	return count + maxChildrenCount;
+}
+
+int curOffset = 0;
+
+void addVars(t_node *node, stack *stk) {
+	assert(stk);
+	
+	if (node == NULL)
+		return;
+	
+	if ((node->val->type == OP && (node->val->val.i == 'i' || node->val->val.i == 'w')) || node->val->type == CONST ||
+			node->val->type == FUNCTION || node->val->type == VAR)
+		return;
+	
+	if (node->val->type == OP && node->val->val.i == '=') {
+		mapResetErrno(&Vars);
+		mapGet(&Vars, node->left->val->val.s);
+		if (mapErrno(&Vars) == MAP_NO_SUCH_ELEMENT) {
+			mapAdd(&Vars, node->left->val->val.s, curOffset);
+			curOffset -= 8;
+			stackPush(stk, node->left->val->val.s);
+		}
+		
+		return;
+	}
+	
+	addVars(node->left, stk);
+	addVars(node->right, stk);
+}
+
+void addArgs(t_node *node) {
+	if (node == NULL)
+		return;
+	
+	if (node->val->type == VAR) {
+		mapAdd(&Vars, node->val->val.s, curOffset);
+		
+		curOffset -= 8;
+	}
+	
+	addArgs(node->left);
+	addArgs(node->right);
 }
 
 size_t getWordLength() {
@@ -555,53 +712,68 @@ int nodeToAsm(t_node *node, FILE *out) {
 	if (node == NULL)
 		return 0;
 	
+	stack *stk = NULL;
+	
 	switch (node->val->type) {
 	case CONST:
-		fprintf(out, "push %d\n", node->val->val);
+		fprintf(out, "mov rax, %d\n"
+					 "push rax\n", node->val->val.i);
 		return 1;
 	case VAR:
-		fprintf(out, "pushr r%d\n", node->val->val - 'a');
+		fprintf(out, "push [rbp + (%d)]\n", mapGet(&Vars, node->val->val.s));
 		return 1;
 	case FUNCTION:
-		for (int i = 14; i >= 0; i--) {
-			fprintf(out, "pushr r%d\n", i);
-		}
-		if (node->right != NULL) {
-			ArgsCounter = 1;
-			nodeToAsm(node->right, out);
-			for (int i = 0; i < ArgsCounter; i++) {
-				fprintf(out, "popr r%d\n", i > 14 ? 15 : i);
-			}
-			for (int i = ArgsCounter; i < 15; i++) {
-				fprintf(out, "push 0\n"
-							 "popr r%d\n", i);
-			}
-		}
-		fprintf(out, "call func%d\n", node->val->val);
-		fprintf(out, "popr r15\n");
-		for (int i = 0; i < 15; i++) {
-			fprintf(out, "popr r%d\n", i);
-		}
-		fprintf(out, "pushr r15\n");
+		fprintf(out, "sub rsp, 8\n");
+		nodeToAsm(node->right, out);
+		fprintf(out, "call %s\n"
+					 "add rsp, %d\n", node->val->val.s, getArgCount(node->right) * 8);
 		return 1;
 	case FUNCTION_DECLARATION:
-		fprintf(out, "func%d:\n", node->val->val);
+		stk = calloc(1, sizeof(stack));
+		stackCtor(stk);
+		curOffset = getArgCount(node->left) * 8 + 8;
+		mapAdd(&Vars, "_retVal", curOffset + 8);
+		addArgs(node->left);
+		fprintf(out, "%s:\n"
+					 "push rbp\n"
+					 "mov rbp, rsp\n"
+					 "sub rsp, %d\n", node->val->val.s, getVarCount(node->right) * 8);
+		curOffset = -8;
+		addVars(node, stk);
+		stackDtor(stk);
+		free(stk);
 		nodeToAsm(node->right, out);
+		mapClear(&Vars);
 		return 1;
 	case OP:
-		switch ((char) node->val->val) {
+		switch ((char) node->val->val.i) {
 		case ',':
 			ArgsCounter++;
 			nodeToAsm(node->right, out);
 			nodeToAsm(node->left, out);
 			return 1;
 		case 'p':
-			fprintf(out, "pop\n");
+			fprintf(out, "pop rax\n");
 			return 1;
 		case '0':
-			fprintf(out, "main:\n");
+			fprintf(out, "_start:\n"
+						 "push rbp\n"
+						 "mov rbp, rsp\n"
+						 "sub rsp, %d\n", getVarCount(node->right) * 8);
+			stk = calloc(1, sizeof(stack));
+			stackCtor(stk);
+			curOffset = -8;
+			addVars(node->right, stk);
 			nodeToAsm(node->right, out);
-			fprintf(out, "end\n");
+			while (stackSize(stk)) {
+				mapRemove(&Vars, stackPop(stk));
+			}
+			stackDtor(stk);
+			free(stk);
+			fprintf(out, "leave\n"
+						 "mov rax, 0x3c\n"
+						 "xor rdi, rdi\n"
+						 "syscall\n");
 			return 1;
 		case ';':
 		case 'l':
@@ -617,33 +789,51 @@ int nodeToAsm(t_node *node, FILE *out) {
 		case '+':
 			nodeToAsm(node->left, out);
 			nodeToAsm(node->right, out);
-			fprintf(out, "add\n");
+			fprintf(out, "pop rbx\n"
+						 "pop rax\n"
+						 "add rax, rbx\n"
+						 "push rax\n");
 			return 1;
 		case '-':
 			nodeToAsm(node->left, out);
 			nodeToAsm(node->right, out);
-			fprintf(out, "sub\n");
+			fprintf(out, "pop rbx\n"
+						 "pop rax\n"
+						 "sub rax, rbx\n"
+						 "push rax\n");
 			return 1;
 		case '*':
 			nodeToAsm(node->left, out);
 			nodeToAsm(node->right, out);
-			fprintf(out, "mul\n");
+			fprintf(out, "pop rbx\n"
+						 "pop rax\n"
+						 "xor rdx, rdx\n"
+						 "imul rbx\n"
+						 "push rax\n");
 			return 1;
 		case '/':
 			nodeToAsm(node->left, out);
 			nodeToAsm(node->right, out);
-			fprintf(out, "div\n");
+			fprintf(out, "pop rbx\n"
+						 "pop rax\n"
+						 "xor rdx, rdx\n"
+						 "idiv rbx\n"
+						 "push rax\n");
 			return 1;
 		
 		case 'i':
-			if (node->right->val->val != '|') {
+			if (node->right->val->val.i != '|') {
 				nodeToAsm(node->left, out);
 				int counter = IfCounter;
 				if (node->left->val->type != OP) {
-					fprintf(out, "push 0\n"
+					fprintf(out, "pop rax\n"
+								 "test rax, rax\n"
 								 "je if%d_end\n", counter);
 				} else {
-					switch (node->left->val->val) {
+					fprintf(out, "pop rbx\n"
+								 "pop rax\n"
+								 "cmp rax, rbx\n");
+					switch (node->left->val->val.i) {
 					case 'l':
 						fprintf(out, "ja if%d_end\n", counter);
 						break;
@@ -663,22 +853,34 @@ int nodeToAsm(t_node *node, FILE *out) {
 						fprintf(out, "je if%d_end\n", counter);
 						break;
 					default:
-						fprintf(out, "push 0\n"
+						fprintf(out, "push rax\n"
+									 "test rbx, rbx\n"
 									 "je if%d_end\n", counter);
 					}
 				}
 				IfCounter++;
+				stk = calloc(1, sizeof(stack));
+				stackCtor(stk);
+				addVars(node->right, stk);
 				nodeToAsm(node->right, out);
+				while (stackSize(stk)) {
+					mapRemove(&Vars, stackPop(stk));
+				}
+				stackDtor(stk);
+				free(stk);
 				fprintf(out, "if%d_end:\n", counter);
-				return 1;
 			} else {
 				nodeToAsm(node->left, out);
 				int counter = IfCounter;
 				if (node->left->val->type != OP) {
-					fprintf(out, "push 0\n"
+					fprintf(out, "pop rax\n"
+								 "test rax, rax\n"
 								 "je else%d\n", counter);
 				} else {
-					switch (node->left->val->val) {
+					fprintf(out, "pop rbx\n"
+								 "pop rax\n"
+								 "cmp rax, rbx\n");
+					switch (node->left->val->val.i) {
 					case 'l':
 						fprintf(out, "ja else%d\n", counter);
 						break;
@@ -698,27 +900,51 @@ int nodeToAsm(t_node *node, FILE *out) {
 						fprintf(out, "je else%d\n", counter);
 						break;
 					default:
-						fprintf(out, "push 0\n"
+						fprintf(out, "push rax\n"
+									 "test rbx, rbx\n"
 									 "je else%d\n", counter);
 					}
 				}
 				IfCounter++;
+				stk = calloc(1, sizeof(stack));
+				stackCtor(stk);
+				addVars(node->right->left, stk);
 				nodeToAsm(node->right->left, out);
+				while (stackSize(stk)) {
+					mapRemove(&Vars, stackPop(stk));
+					curOffset += 8;
+				}
 				fprintf(out, "jmp if%d_end\n"
 							 "else%d:\n", counter, counter);
+				addVars(node->right->right, stk);
 				nodeToAsm(node->right->right, out);
+				while (stackSize(stk)) {
+					mapRemove(&Vars, stackPop(stk));
+					curOffset += 8;
+				}
+				stackDtor(stk);
+				free(stk);
 				fprintf(out, "if%d_end:\n", counter);
-				return 1;
 			}
+			
+			return 1;
 		case 'w':
+			stk = calloc(1, sizeof(stack));
+			stackCtor(stk);
+			addVars(node->right, stk);
+			
 			fprintf(out, "loop%d:\n", LoopCounter);
 			int counter = LoopCounter;
 			nodeToAsm(node->left, out);
 			if (node->left->val->type != OP) {
-				fprintf(out, "push 0\n"
+				fprintf(out, "pop rax\n"
+							 "test rax, rax\n"
 							 "je loop%d_end\n", counter);
 			} else {
-				switch (node->left->val->val) {
+				fprintf(out, "pop rbx\n"
+							 "pop rax\n"
+							 "cmp rax, rbx\n");
+				switch (node->left->val->val.i) {
 				case 'l':
 					fprintf(out, "ja loop%d_end\n", counter);
 					break;
@@ -738,7 +964,8 @@ int nodeToAsm(t_node *node, FILE *out) {
 					fprintf(out, "je loop%d_end\n", counter);
 					break;
 				default:
-					fprintf(out, "push 0\n"
+					fprintf(out, "push rax\n"
+								 "test rbx, rbx\n"
 								 "je loop%d_end\n", counter);
 				}
 			}
@@ -746,39 +973,39 @@ int nodeToAsm(t_node *node, FILE *out) {
 			nodeToAsm(node->right, out);
 			fprintf(out, "jmp loop%d\n", counter);
 			fprintf(out, "loop%d_end:\n", counter);
+			
+			while (stackSize(stk)) {
+				mapRemove(&Vars, stackPop(stk));
+				curOffset += 8;
+			}
+			stackDtor(stk);
+			free(stk);
 			return 1;
 		
 		case '=':
 			nodeToAsm(node->right, out);
-			fprintf(out, "popr r%d\n", node->left->val->val - 'a');
-			return 1;
-		
-		case 'm':
-			fprintf(out, "meow\n");
-			return 1;
-		case 'd':
-			fprintf(out, "dump\n");
-			return 1;
-		
-		case 's':
-			nodeToAsm(node->right, out);
-			fprintf(out, "sqrt\n");
+			fprintf(out, "pop [rbp + (%d)]\n", mapGet(&Vars, node->left->val->val.s));
 			return 1;
 		
 		case 'O':
 			nodeToAsm(node->right, out);
-			fprintf(out, "out\n");
+			fprintf(out, "call out\n");
 			return 1;
 		case 'I':
-			fprintf(out, "in\n");
+			fprintf(out, "sub rsp, 8\n"
+						 "call in\n");
 			return 1;
 		
 		case 'r':
 			if (node->right == NULL)
-				fprintf(out, "push 0\n");
+				fprintf(out, "mov rax, 0\n"
+							 "push rax\n");
 			else
 				nodeToAsm(node->right, out);
-			fprintf(out, "ret\n");
+			fprintf(out, "pop rax\n"
+						 "mov [rbp + (%d)], rax\n"
+						 "leave\n"
+						 "ret\n", mapGet(&Vars, "_retVal"));
 			return 1;
 		
 		default:
@@ -795,7 +1022,12 @@ int treeToAsm(t_node *root, char *file) {
 	
 	FILE *out = fopen(file, "wb");
 	
-	fprintf(out, "jmp main\n");
+	fprintf(out, ".intel_syntax noprefix\n"
+				 "\n"
+				 "\t\t.globl _start\n"
+				 "\n"
+				 ".text\n");
+	mapClear(&Vars);
 	nodeToAsm(root, out);
 	
 	fclose(out);

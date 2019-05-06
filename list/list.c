@@ -159,7 +159,7 @@ int listOk(list *l) {
 	return 1;
 }
 
-void plotGraph(list *l) {
+void plotListGraph(list *l) {
 	assert(l);
 	
 	FILE *out = fopen("list.dv", "wb");
@@ -213,7 +213,7 @@ void listDump(list *l) {
 	printf("\tsorted = %d\n", l->sorted);
 	printf("}\n");
 	
-	plotGraph(l);
+	plotListGraph(l);
 }
 
 int listInsert(list *l, int idx, list_data_t el) {
@@ -298,7 +298,7 @@ int listRemove(list *l, int idx) {
 	}
 	
 	if (l->size == 1) {
-//		free(l->data[idx]->key);
+		free(l->data[idx]->key);
 		free(l->data[idx]);
 		l->data[idx] = NULL;
 		l->next[l->head] = l->free;
@@ -316,8 +316,8 @@ int listRemove(list *l, int idx) {
 	if (idx == l->head) {
 		l->head = l->next[l->head];
 		l->prev[l->head] = 0;
-
-//		free(l->data[idx]->key);
+		
+		free(l->data[idx]->key);
 		free(l->data[idx]);
 		l->data[idx] = NULL;
 		l->next[idx] = l->free;
@@ -332,8 +332,8 @@ int listRemove(list *l, int idx) {
 	if (idx == l->tail) {
 		l->tail = l->prev[l->tail];
 		l->next[l->tail] = 0;
-
-//		free(l->data[idx]->key);
+		
+		free(l->data[idx]->key);
 		free(l->data[idx]);
 		l->data[idx] = NULL;
 		l->next[idx] = l->free;
@@ -354,6 +354,41 @@ int listRemove(list *l, int idx) {
 	
 	l->size--;
 	l->sorted = 0;
+	
+	return l->errno;
+}
+
+int listClear(list *l) {
+	assert(l);
+	
+	for (int i = 1; i < l->capacity; i++) {
+		if (l->data[i] != NULL) {
+			free(l->data[i]->key);
+			free(l->data[i]);
+			l->data[i] = NULL;
+		}
+		
+	}
+	
+	l->data[0] = 0;
+	l->next[0] = 0;
+	l->prev[0] = 0;
+	for (int i = 1; i < l->capacity; i++) { // free list
+		l->next[i] = i + 1;
+		l->prev[i] = -1;
+	}
+	l->next[l->capacity] = 0;
+	l->prev[l->capacity] = -1;
+	
+	l->capacity = l->capacity;
+	l->size = 0;
+	l->head = 0;
+	l->tail = 0;
+	l->free = 1;
+	
+	l->errno = LIST_NO_ERROR;
+	
+	l->sorted = 1;
 	
 	return l->errno;
 }

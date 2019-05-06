@@ -2,7 +2,7 @@
 
 #define STACK_H
 
-typedef int data_t;
+typedef char *data_t;
 typedef struct stack stack;
 
 enum stackError {

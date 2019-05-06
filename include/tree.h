@@ -37,7 +37,10 @@ struct t_node {
 
 struct token {
 	char type;
-	int val;
+	union {
+		int i;
+		char *s;
+	} val;
 };
 
 int treeCtor(tree *t);
@@ -65,7 +68,8 @@ void process(t_node *node, void (*operation)(t_node *node));
 
 void tNodeCtor(t_node *node, tree_data_t val);
 void tNodeDtor(t_node *node);
-t_node *createNode(char type, int val, t_node *left, t_node *right);
+t_node *createNodeInt(char type, int val, t_node *left, t_node *right);
+t_node *createNodeStr(char type, char *val, t_node *left, t_node *right);
 
 tree_data_t tNodeVal(t_node *node);
 t_node *tNodeLeft(t_node *node);

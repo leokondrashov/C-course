@@ -44,6 +44,7 @@ void listDump(list *l);
 
 int listInsert(list *l, int idx, list_data_t el);
 int listRemove(list *l, int idx);
+int listClear(list *l);
 
 int listFindVerySlow(list *l, const char *key);
 

@@ -124,9 +124,11 @@ int mapAdd(map *m, m_key_t key, val_t val) {
 		newEl->val = val;
 		
 		listInsert(&(m->table[keyHash]), listTail(&(m->table[keyHash])), newEl);
+		m->size++;
+		return 1;
 	}
-	m->size++;
-	return 1;
+	
+	return 0;
 }
 
 /*!
@@ -171,6 +173,19 @@ int mapRemove(map *m, m_key_t key) {
 	listRemove(&(m->table[keyHash]), idx);
 	m->size--;
 	return 1;
+}
+
+int mapClear(map *m) {
+	assert(m);
+	
+	for (int i = 0; i < HASH_SIZE; i++) {
+		listClear(&(m->table[i]));
+	}
+	
+	m->size = 0;
+	m->errno = MAP_NO_ERROR;
+	
+	return m->errno;
 }
 
 /*!

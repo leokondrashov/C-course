@@ -24,6 +24,8 @@ void freeNodes(t_node *node) {
 	
 	freeNodes(node->left);
 	freeNodes(node->right);
+	if (node->val->type == FUNCTION_DECLARATION || node->val->type == FUNCTION || node->val->type == VAR)
+		free(node->val->val.s);
 	free(node->val);
 	tNodeDtor(node);
 	free(node);
@@ -113,19 +115,19 @@ void printGraphNodeVal(t_node *node) {
 	
 	switch (node->val->type) {
 	case OP:
-		Fprintf("OP; \\\"%c\\\"", (char) node->val->val);
+		Fprintf("OP; \\\"%c\\\"", (char) node->val->val.i);
 		break;
 	case VAR:
-		Fprintf("VAR; \\\"%c\\\"", (char) node->val->val);
+		Fprintf("VAR; \\\"%s\\\"", node->val->val.s);
 		break;
 	case CONST:
-		Fprintf("CONST; %d", node->val->val);
+		Fprintf("CONST; %d", node->val->val.i);
 		break;
 	case FUNCTION:
-		Fprintf("FUNC; %d", node->val->val);
+		Fprintf("FUNC; \\\"%s\\\"", node->val->val.s);
 		break;
 	case FUNCTION_DECLARATION:
-		Fprintf("FUNC_DECL; %d", node->val->val);
+		Fprintf("FUNC_DECL; \\\"%s\\\"", node->val->val.s);
 		break;
 	default:
 		Fprintf("Unknown");
@@ -148,7 +150,7 @@ void printGraphNode(t_node *node) {
 		Fprintf("\tn%p:n -> n%p;\n", node, node->parent);
 }
 
-void plotGraph(tree *t) {
+void plotTreeGraph(tree *t) {
 	assert(t);
 	
 	Fopen("tree.dv");
@@ -171,7 +173,7 @@ void treeDump(tree *t) {
 	printf("\tsize = %d\n", t->size);
 	printf("}\n");
 	
-	plotGraph(t);
+	plotTreeGraph(t);
 }
 
 int treeAddLeft(tree *t, t_node *node, t_node *newLeft) {
@@ -310,14 +312,30 @@ void tNodeDtor(t_node *node) {
 	node->parent = NULL;
 }
 
-t_node *createNode(char type, int val, t_node *left, t_node *right) {
+t_node *createNodeStr(char type, char *val, t_node *left, t_node *right) {
 	assert(type >= 0 && type < MAX_TOKEN_TYPE);
 	
 	t_node *node = (t_node *) calloc(1, sizeof(t_node));
 	struct token *tkn = (struct token *) calloc(1, sizeof(struct token));
 	
 	tkn->type = type;
-	tkn->val = val;
+	tkn->val.s = val;
+	
+	node->val = tkn;
+	node->left = left;
+	node->right = right;
+	
+	return node;
+}
+
+t_node *createNodeInt(char type, int val, t_node *left, t_node *right) {
+	assert(type >= 0 && type < MAX_TOKEN_TYPE);
+	
+	t_node *node = (t_node *) calloc(1, sizeof(t_node));
+	struct token *tkn = (struct token *) calloc(1, sizeof(struct token));
+	
+	tkn->type = type;
+	tkn->val.i = val;
 	
 	node->val = tkn;
 	node->left = left;
@@ -385,7 +403,7 @@ int Fprintf(char *fmt, ...) {
 	
 	return res;
 }
-
+/*
 char *loadNodeValue(t_node *node, char *line) {
 	assert(node);
 	assert(line);
@@ -570,3 +588,4 @@ int treeFind(tree *t, char *path, tree_data_t val) {
 	
 	return findNode(t->root, path, val);
 }
+*/

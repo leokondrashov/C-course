@@ -31,6 +31,7 @@ void printDistribution(map *m);
 int mapAdd(map *m, m_key_t key, val_t val);
 val_t mapGet(map *m, m_key_t key);
 int mapRemove(map *m, m_key_t key);
+int mapClear(map *m);
 
 unsigned int mapSize(map *m);
 int mapErrno(map *m);

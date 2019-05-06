@@ -42,10 +42,10 @@ CPU: stack.o textProcessor.o SoftCPU/CPU.c
 	$(CC) -g -o $(BDIR)/CPU $(CFLAGS) SoftCPU/CPU.c $(ODIR)/textProcessor.o $(ODIR)/stack.o -lm
 
 textProcessor.o: Shakespeare/textProcessor.c
-	$(CC) -pg -c -o $(ODIR)/textProcessor.o $(CFLAGS) Shakespeare/textProcessor.c
+	$(CC) -g -c -o $(ODIR)/textProcessor.o $(CFLAGS) Shakespeare/textProcessor.c
 
 list.o: list/list.c
-	$(CC) -pg -c -o $(ODIR)/list.o $(CFLAGS) list/list.c -DNDEBUG
+	$(CC) -g -c -o $(ODIR)/list.o $(CFLAGS) list/list.c -DNDEBUG
 
 list_test: list.o list/unittest.c
 	$(CC) -g -o $(BDIR)/list_test $(CFLAGS) list/unittest.c $(ODIR)/list.o
@@ -65,5 +65,5 @@ differentiator: differentiator/differentiator.c tree.o textProcessor.o recursive
 recursiveDescent.o: differentiator/recursiveDescent.c tree.o
 	$(CC) -g -c -o $(ODIR)/recursiveDescent.o $(CFLAGS) differentiator/recursiveDescent.c -lm
 
-compiler: language/compiler.c tree.o textProcessor.o map.o
-	$(CC) -g -o $(BDIR)/compiler $(CFLAGS) language/compiler.c $(ODIR)/textProcessor.o $(ODIR)/tree.o $(ODIR)/map.o
+compiler: language/compiler.c tree.o textProcessor.o map.o stack.o
+	$(CC) -g -o $(BDIR)/compiler $(CFLAGS) language/compiler.c $(ODIR)/textProcessor.o $(ODIR)/tree.o $(ODIR)/map.o $(ODIR)/list.o $(ODIR)/stack.o
