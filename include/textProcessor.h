@@ -11,6 +11,6 @@ int getLine(char buff[], int maxSize);
 void sort(char *lines[], int left, int right, int (*comp)(const char *, const char *));
 int strComp(const char *first, const char *second);
 int strCompFromEnd(const char *first, const char *second);
-const char *skipSpaces(const char *ptr);
+char *skipSpaces(char *ptr);
 
 #endif

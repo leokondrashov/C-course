@@ -24,8 +24,8 @@ void freeNodes(t_node *node) {
 	
 	freeNodes(node->left);
 	freeNodes(node->right);
-	if (node->val->type == FUNCTION_DECLARATION || node->val->type == FUNCTION || node->val->type == VAR)
-		free(node->val->val.s);
+//	if (node->val->type == FUNCTION_DECLARATION || node->val->type == FUNCTION || node->val->type == VAR)
+//		free(node->val->val);
 	free(node->val);
 	tNodeDtor(node);
 	free(node);
@@ -115,19 +115,19 @@ void printGraphNodeVal(t_node *node) {
 	
 	switch (node->val->type) {
 	case OP:
-		Fprintf("OP; \\\"%c\\\"", (char) node->val->val.i);
+		Fprintf("OP; \\\"%d\\\"", (char) node->val->val);
 		break;
 	case VAR:
-		Fprintf("VAR; \\\"%s\\\"", node->val->val.s);
+		Fprintf("VAR; \\\"%d\\\"", node->val->val);
 		break;
 	case CONST:
-		Fprintf("CONST; %d", node->val->val.i);
+		Fprintf("CONST; %d", node->val->val);
 		break;
 	case FUNCTION:
-		Fprintf("FUNC; \\\"%s\\\"", node->val->val.s);
+		Fprintf("FUNC; \\\"%d\\\"", node->val->val);
 		break;
 	case FUNCTION_DECLARATION:
-		Fprintf("FUNC_DECL; \\\"%s\\\"", node->val->val.s);
+		Fprintf("FUNC_DECL; \\\"%d\\\"", node->val->val);
 		break;
 	default:
 		Fprintf("Unknown");
@@ -312,30 +312,14 @@ void tNodeDtor(t_node *node) {
 	node->parent = NULL;
 }
 
-t_node *createNodeStr(char type, char *val, t_node *left, t_node *right) {
+t_node *createNode(char type, int val, t_node *left, t_node *right) {
 	assert(type >= 0 && type < MAX_TOKEN_TYPE);
 	
 	t_node *node = (t_node *) calloc(1, sizeof(t_node));
 	struct token *tkn = (struct token *) calloc(1, sizeof(struct token));
 	
 	tkn->type = type;
-	tkn->val.s = val;
-	
-	node->val = tkn;
-	node->left = left;
-	node->right = right;
-	
-	return node;
-}
-
-t_node *createNodeInt(char type, int val, t_node *left, t_node *right) {
-	assert(type >= 0 && type < MAX_TOKEN_TYPE);
-	
-	t_node *node = (t_node *) calloc(1, sizeof(t_node));
-	struct token *tkn = (struct token *) calloc(1, sizeof(struct token));
-	
-	tkn->type = type;
-	tkn->val.i = val;
+	tkn->val = val;
 	
 	node->val = tkn;
 	node->left = left;
@@ -403,43 +387,31 @@ int Fprintf(char *fmt, ...) {
 	
 	return res;
 }
-/*
+
 char *loadNodeValue(t_node *node, char *line) {
 	assert(node);
 	assert(line);
 	
 	line = skipSpaces(line);
-	int nextPos = 0;
-	sscanf(line, "%lg%n", &node->val->val, &nextPos);
-	if (nextPos != 0) {
-		node->val->type = CONST;
-		return line + nextPos;
-	}
 	
-	if (*line == 'x') {
-		node->val->type = VAR;
-		node->val->val = 'x';
-		return line + 1;
-	}
-		
-		#define DEF_OP(name, code, diff) \
-    if (strncasecmp(line, #name, strlen(#name)) == 0) { \
-        node->val->type = OP; \
-        node->val->val = code; \
-        return line + strlen(#name); \
-    }
-		#include "../differentiator/operations.h"
-	#undef DEF_OP
+	int nextPos = 0, type = 0;
 	
-	return NULL;
-
-//	char *buff = (char *) calloc(BUFF_SIZE, sizeof(char));
-//	sscanf(in, " %*[\n]");
-//	fgets(buff, BUFF_SIZE - 1, in);
-//	size_t len = strlen(buff);
-//	node->val = (char *) calloc(len + 1, sizeof(char));
-//	strncpy(node->val, buff, len - (buff[len - 1] == '\n' ? 1 : 0));
-//	free(buff);
+	sscanf(line, "%d%n", &type, &nextPos);
+	if (nextPos == 0)
+		return NULL;
+	
+	node->val->type = (char) type;
+	line += nextPos;
+	line = skipSpaces(line);
+	
+	sscanf(line, "%d%n", &(node->val->val), &nextPos);
+	if (nextPos == 0)
+		return NULL;
+	
+	line += nextPos;
+	line = skipSpaces(line);
+	
+	return line;
 }
 
 char *loadNode(t_node *node, char *line) {
@@ -447,29 +419,95 @@ char *loadNode(t_node *node, char *line) {
 	assert(line);
 	
 	line = skipSpaces(line);
-	if (*line == '(') {
-		node->left = createNode(0, 0, NULL, NULL);
-		line = loadNode(node->left, ++line);
-		if (line == NULL)
-			return NULL;
-		line = skipSpaces(line);
-	}
 	
 	line = loadNodeValue(node, line);
 	if (line == NULL)
 		return NULL;
+	
 	line = skipSpaces(line);
 	
-	if (*line == '(') {
+	if (node->val->type == FUNCTION_DECLARATION
+			|| (node->val->type == OP && (node->val->val == IF || node->val->val == WHILE))) {
+		node->left = createNode(0, 0, NULL, NULL);
+		line = loadNode(node->left, ++line);
+		if (line == NULL)
+			return NULL;
+		
+		line = skipSpaces(line);
 		node->right = createNode(0, 0, NULL, NULL);
 		line = loadNode(node->right, ++line);
 		if (line == NULL)
 			return NULL;
 		line = skipSpaces(line);
+		
+		while (*line == '(') {
+			t_node *op = createNode(0, 0, NULL, NULL);
+			line = loadNode(op, ++line);
+			if (line == NULL)
+				return NULL;
+			
+			node->right = createNode(OP, SEPARATOR, node->right, op);
+			line = skipSpaces(line);
+		}
+	} else if ((node->val->type == OP && (node->val->val == OUT || node->val->val == MAIN))
+			|| node->val->type == FUNCTION) {
+		line = skipSpaces(line);
+		node->right = createNode(0, 0, NULL, NULL);
+		line = loadNode(node->right, ++line);
+		if (line == NULL)
+			return NULL;
+		line = skipSpaces(line);
+		while (*line == '(') {
+			t_node *op = createNode(0, 0, NULL, NULL);
+			line = loadNode(op, ++line);
+			if (line == NULL)
+				return NULL;
+			
+			node->right = createNode(OP, SEPARATOR, node->right, op);
+			line = skipSpaces(line);
+		}
+	} else if (node->val->type == OP && node->val->val == RETURN) {
+		line = skipSpaces(line);
+		if (*line == ')')
+			return line + 1;
+		
+		node->right = createNode(0, 0, NULL, NULL);
+		line = loadNode(node->right, ++line);
+		if (line == NULL)
+			return NULL;
+		line = skipSpaces(line);
+		while (*line == '(') {
+			t_node *op = createNode(0, 0, NULL, NULL);
+			line = loadNode(op, ++line);
+			if (line == NULL)
+				return NULL;
+			
+			node->right = createNode(OP, SEPARATOR, node->right, op);
+			line = skipSpaces(line);
+		}
+	} else {
+		
+		if (*line == '(') {
+			node->left = createNode(0, 0, NULL, NULL);
+			line = loadNode(node->left, ++line);
+			if (line == NULL)
+				return NULL;
+			line = skipSpaces(line);
+		}
+		
+		if (*line == '(') {
+			node->right = createNode(0, 0, NULL, NULL);
+			line = loadNode(node->right, ++line);
+			if (line == NULL)
+				return NULL;
+			line = skipSpaces(line);
+		}
 	}
 	
-	if (*line != ')')
+	if (*line != ')') {
+		printf("error: %s", line);
 		return NULL;
+	}
 	
 	return line + 1;
 }
@@ -481,7 +519,7 @@ int treeLoadFromFile(tree *t, const char *file) {
 	if (t->root != NULL)
 		return 0;
 	
-	int fileSize = sizeofFile(file);
+	size_t fileSize = sizeofFile(file);
 	if (fileSize < 0)
 		return 0;
 	char *buff = (char *) calloc(fileSize + 1, sizeof(char));
@@ -496,12 +534,28 @@ int treeLoadFromFile(tree *t, const char *file) {
 	}
 	
 	t->root = createNode(0, 0, NULL, NULL);
-	
-	if (loadNode(t->root, ++line) == NULL) {
+	line = loadNode(t->root, ++line);
+	if (line == NULL) {
 		freeNodes(t->root);
 		t->root = NULL;
 		free(buff);
 		return 0;
+	}
+	
+	line = skipSpaces(line);
+//	printf("%s", line);
+	while (*line == '(') {
+//		printf("|");
+		t_node *node = createNode(0, 0, NULL, NULL);
+		line = loadNode(node, ++line);
+		if (line == NULL) {
+			freeNodes(t->root);
+			t->root = NULL;
+			free(buff);
+			return 0;
+		}
+		t->root = createNode(OP, SEPARATOR, t->root, node);
+		line = skipSpaces(line);
 	}
 	
 	free(buff);
@@ -509,43 +563,62 @@ int treeLoadFromFile(tree *t, const char *file) {
 	return 1;
 }
 
-void printNodeVal(t_node *node) {
+void printNodeVal(t_node *node, int indent) {
 	if (node == NULL) {
 		return;
 	}
 	
-	switch (node->val->type) {
-	case CONST:
-		Fprintf("%g ", node->val->val);
-		break;
-	case VAR:
-		Fprintf("%c ", (char) node->val->val);
-		break;
-	case OP:
-		#define DEF_OP(name, code, diff) \
-        if (code == (char) node->val->val) { \
-            Fprintf("%s ", #name); \
-            break; \
-        }
-		#include "../differentiator/operations.h"
-		#undef DEF_OP
+	for (int i = 0; i < indent; ++i) {
+		Fprintf("\t");
 	}
+	Fprintf("%d %d\n", node->val->type, node->val->val);
 }
 
-void printTextNode(t_node *node) {
+void printTextNode(t_node *node, int indent) {
 	if (node == NULL) {
 		return;
 	}
 	
-	Fprintf("( ");
-	printTextNode(node->left);
-	
-	printNodeVal(node);
-//	Fprintf("%d ", node->val);
-//	Fprintf("%s ", node->val);
-	
-	printTextNode(node->right);
-	Fprintf(") ");
+	if (node->val->type == OP && node->val->val == SEPARATOR) {
+		printTextNode(node->left, indent);
+		printTextNode(node->right, indent);
+	} else if (node->val->type == FUNCTION_DECLARATION) {
+		for (int i = 0; i < indent; ++i) {
+			Fprintf("\t");
+		}
+		Fprintf("(\n");
+		
+		printNodeVal(node, indent + 1);
+		
+		t_node *argNum = createNode(CONST, (tNodeCountChildren(node->left) + 2) / 2, NULL, NULL);
+		printTextNode(argNum, indent + 1);
+		free(argNum);
+		printTextNode(node->right, indent + 1);
+		for (int i = 0; i < indent; ++i) {
+			Fprintf("\t");
+		}
+		Fprintf(")\n");
+		
+	} else {
+		
+		for (int i = 0; i < indent; ++i) {
+			Fprintf("\t");
+		}
+		Fprintf("(\n");
+		
+		printNodeVal(node, indent + 1);
+		printTextNode(node->left, indent + 1);
+
+//		Fprintf("%d ", node->val);
+//		Fprintf("%s ", node->val);
+		
+		printTextNode(node->right, indent + 1);
+		
+		for (int i = 0; i < indent; ++i) {
+			Fprintf("\t");
+		}
+		Fprintf(")\n");
+	}
 }
 
 int treeSaveToFile(tree *t, const char *file) {
@@ -554,7 +627,7 @@ int treeSaveToFile(tree *t, const char *file) {
 	if (Fopen(file) != 0)
 		return 0;
 	
-	printTextNode(t->root);
+	printTextNode(t->root, 0);
 	
 	Fclose();
 	return 1;
@@ -588,4 +661,3 @@ int treeFind(tree *t, char *path, tree_data_t val) {
 	
 	return findNode(t->root, path, val);
 }
-*/

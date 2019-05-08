@@ -22,6 +22,28 @@ enum tokenType {
 	MAX_TOKEN_TYPE
 };
 
+enum operationType {
+	MAIN = 0,
+	RETURN = 1,
+	ASSIGMENT = 2,
+	IF = 3,
+	WHILE = 4,
+	ADD = 5,
+	SUB = 6,
+	MUL = 7,
+	DIV = 8,
+	EQUAL = 9,
+	NOT_EQUAL = 10,
+	GREATER = 11,
+	GREATER_EQUAL = 12,
+	LESS = 13,
+	LESS_EQUAL = 14,
+	IN = 15,
+	OUT = 16,
+	SEPARATOR = 17,
+	IF_SEPARATOR = 18
+};
+
 struct tree {
 	t_node *root;
 	int size;
@@ -37,10 +59,7 @@ struct t_node {
 
 struct token {
 	char type;
-	union {
-		int i;
-		char *s;
-	} val;
+	int val;
 };
 
 int treeCtor(tree *t);
@@ -68,7 +87,7 @@ void process(t_node *node, void (*operation)(t_node *node));
 
 void tNodeCtor(t_node *node, tree_data_t val);
 void tNodeDtor(t_node *node);
-t_node *createNodeInt(char type, int val, t_node *left, t_node *right);
+t_node *createNode(char type, int val, t_node *left, t_node *right);
 t_node *createNodeStr(char type, char *val, t_node *left, t_node *right);
 
 tree_data_t tNodeVal(t_node *node);

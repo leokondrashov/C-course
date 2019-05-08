@@ -241,7 +241,7 @@ int strCompFromEnd(const char *first, const char *second) {
 	return tolower(first[i]) - tolower(second[j]);
 }
 
-const char *skipSpaces(const char *ptr) {
+char *skipSpaces(char *ptr) {
 	assert(ptr);
 	
 	while (isspace(*ptr))
