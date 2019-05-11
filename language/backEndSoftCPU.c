@@ -6,16 +6,17 @@
 #include <assert.h>
 #include <string.h>
 #include <map.h>
-#include <stack.h>
 
-map Functions;
+int *Functions = NULL;
 
 int treeToAsm(t_node *root, char *file);
+void getFunctions(t_node *node);
+int getFunctionCount(t_node *node);
 
 int main(int argc, char *argv[]) {
 	if (argc < 2) {
 		printf("missing file\n");
-		printf("using format: backEndRealCPU file [-o output_file]\n");
+		printf("using format: backEndSoftCpu file [-o output_file]\n");
 		return 0;
 	}
 	
@@ -31,14 +32,14 @@ int main(int argc, char *argv[]) {
 		} else if (infile == NULL) {
 			infile = argv[i];
 		} else {
-			printf("using format: backEndRealCPU file [-o output_file]\n");
+			printf("using format: backEndSoftCpu file [-o output_file]\n");
 			return 0;
 		}
 	}
 	
 	if (infile == NULL) {
 		printf("missing file\n");
-		printf("using format: backEndRealCPU file [-o output_file]\n");
+		printf("using format: backEndSoftCpu file [-o output_file]\n");
 		return 0;
 	}
 	
@@ -46,21 +47,42 @@ int main(int argc, char *argv[]) {
 		outfile = "a.out";
 	}
 	
-	mapCtor(&Functions);
-	
 	tree t = {};
 	treeCtor(&t);
 	treeLoadFromFile(&t, infile);
 //	treeDump(&t);
+	Functions = calloc(getFunctionCount(t.root), sizeof(int));
+	getFunctions(t.root);
 	
 	treeToAsm(t.root, outfile);
 	
 	treeDtor(&t);
-	mapDtor(&Functions);
 }
 
 int getVarCount(t_node *node);
 int getArgCount(t_node *node);
+
+int getFunctionCount(t_node *node) {
+	if (node == NULL)
+		return 0;
+	
+	if (node->val->type == FUNCTION_DECLARATION)
+		return 1;
+	
+	return getFunctionCount(node->left) + getFunctionCount(node->right);
+}
+
+void getFunctions(t_node *node) {
+	if (node == NULL)
+		return;
+	
+	if (node->val->type == FUNCTION_DECLARATION) {
+		Functions[node->val->val] = getVarCount(node->right);
+	}
+	
+	getFunctions(node->left);
+	getFunctions(node->right);
+}
 
 int getVarCount(t_node *node) {
 	if (node == NULL)
@@ -88,11 +110,7 @@ int getArgCount(t_node *node) {
 	return 1;
 }
 
-int IfCounter = 0, LoopCounter = 0, ArgsCounter = 0, Main = 0;
-
-int computeOffset(int varNum) {
-	return (varNum < ArgsCounter) ? ((ArgsCounter - varNum + 1) * 8) : ((varNum - ArgsCounter + 1) * -8);
-}
+int ifCounter = 0, loopCounter = 0, argsCounter = 0;
 
 int nodeToAsm(t_node *node, FILE *out) {
 	if (node == NULL)
@@ -100,40 +118,43 @@ int nodeToAsm(t_node *node, FILE *out) {
 	
 	switch (node->val->type) {
 	case CONST:
-		fprintf(out, "mov rax, %d\n"
-					 "push rax\n", node->val->val);
+		fprintf(out, "push %d\n", node->val->val);
 		return 1;
 	case VAR:
-		fprintf(out, "push [rbp + (%d)]\n", computeOffset(node->val->val));
+		fprintf(out, "pushr r%d\n", node->val->val);
 		return 1;
 	case FUNCTION:
-		fprintf(out, "sub rsp, 8\n");
-		nodeToAsm(node->right, out);
-		fprintf(out, "call func%d\n"
-					 "add rsp, %d\n", node->val->val, getArgCount(node->right) * 8);
+		for (int i = Functions[node->val->val] - 1; i >= 0; i--) {
+			fprintf(out, "pushr r%d\n", i);
+		}
+		if (node->right != NULL) {
+			argsCounter = getArgCount(node->right);
+			nodeToAsm(node->right, out);
+			for (int i = 0; i < argsCounter; i++) {
+				fprintf(out, "popr r%d\n", i > 14 ? 15 : i);
+			}
+			for (int i = argsCounter; i < Functions[node->val->val]; i++) {
+				fprintf(out, "push 0\n"
+							 "popr r%d\n", i);
+			}
+		}
+		fprintf(out, "call func%d\n", node->val->val);
+		fprintf(out, "popr r15\n");
+		for (int i = 0; i < Functions[node->val->val]; i++) {
+			fprintf(out, "popr r%d\n", i);
+		}
+		fprintf(out, "pushr r15\n");
 		return 1;
 	case FUNCTION_DECLARATION:
-		ArgsCounter = getArgCount(node);
-		fprintf(out, "func%d:\n"
-					 "push rbp\n"
-					 "mov rbp, rsp\n"
-					 "sub rsp, %d\n", node->val->val, (getVarCount(node->right) - ArgsCounter) * 8);
+		fprintf(out, "func%d:\n", node->val->val);
 		nodeToAsm(node->right, out);
-		ArgsCounter = 0;
 		return 1;
 	case OP:
 		switch ((char) node->val->val) {
 		case MAIN:
-			fprintf(out, "_start:\n"
-						 "push rbp\n"
-						 "mov rbp, rsp\n"
-						 "sub rsp, %d\n", getVarCount(node->right) * 8);
-			Main = 1;
+			fprintf(out, "main:\n");
 			nodeToAsm(node->right, out);
-			fprintf(out, "leave\n"
-						 "mov rax, 0x3c\n"
-						 "xor rdi, rdi\n"
-						 "syscall\n");
+			fprintf(out, "end\n");
 			return 1;
 		case SEPARATOR:
 			nodeToAsm(node->left, out);
@@ -154,50 +175,32 @@ int nodeToAsm(t_node *node, FILE *out) {
 		case ADD:
 			nodeToAsm(node->left, out);
 			nodeToAsm(node->right, out);
-			fprintf(out, "pop rbx\n"
-						 "pop rax\n"
-						 "add rax, rbx\n"
-						 "push rax\n");
+			fprintf(out, "add\n");
 			return 1;
 		case SUB:
 			nodeToAsm(node->left, out);
 			nodeToAsm(node->right, out);
-			fprintf(out, "pop rbx\n"
-						 "pop rax\n"
-						 "sub rax, rbx\n"
-						 "push rax\n");
+			fprintf(out, "sub\n");
 			return 1;
 		case MUL:
 			nodeToAsm(node->left, out);
 			nodeToAsm(node->right, out);
-			fprintf(out, "pop rbx\n"
-						 "pop rax\n"
-						 "xor rdx, rdx\n"
-						 "imul rbx\n"
-						 "push rax\n");
+			fprintf(out, "mul\n");
 			return 1;
 		case DIV:
 			nodeToAsm(node->left, out);
 			nodeToAsm(node->right, out);
-			fprintf(out, "pop rbx\n"
-						 "pop rax\n"
-						 "xor rdx, rdx\n"
-						 "idiv rbx\n"
-						 "push rax\n");
+			fprintf(out, "div\n");
 			return 1;
 		
 		case IF:
-			if (node->right->val->val != '|') {
+			if (node->right->val->val != IF_SEPARATOR) {
 				nodeToAsm(node->left, out);
-				int counter = IfCounter;
+				int counter = ifCounter;
 				if (node->left->val->type != OP) {
-					fprintf(out, "pop rax\n"
-								 "test rax, rax\n"
+					fprintf(out, "push 0\n"
 								 "je if%d_end\n", counter);
 				} else {
-					fprintf(out, "pop rbx\n"
-								 "pop rax\n"
-								 "cmp rax, rbx\n");
 					switch (node->left->val->val) {
 					case LESS_EQUAL:
 						fprintf(out, "ja if%d_end\n", counter);
@@ -218,25 +221,21 @@ int nodeToAsm(t_node *node, FILE *out) {
 						fprintf(out, "je if%d_end\n", counter);
 						break;
 					default:
-						fprintf(out, "push rax\n"
-									 "test rbx, rbx\n"
+						fprintf(out, "push 0\n"
 									 "je if%d_end\n", counter);
 					}
 				}
-				IfCounter++;
+				ifCounter++;
 				nodeToAsm(node->right, out);
 				fprintf(out, "if%d_end:\n", counter);
+				return 1;
 			} else {
 				nodeToAsm(node->left, out);
-				int counter = IfCounter;
+				int counter = ifCounter;
 				if (node->left->val->type != OP) {
-					fprintf(out, "pop rax\n"
-								 "test rax, rax\n"
+					fprintf(out, "push 0\n"
 								 "je else%d\n", counter);
 				} else {
-					fprintf(out, "pop rbx\n"
-								 "pop rax\n"
-								 "cmp rax, rbx\n");
 					switch (node->left->val->val) {
 					case LESS_EQUAL:
 						fprintf(out, "ja else%d\n", counter);
@@ -257,33 +256,26 @@ int nodeToAsm(t_node *node, FILE *out) {
 						fprintf(out, "je else%d\n", counter);
 						break;
 					default:
-						fprintf(out, "push rax\n"
-									 "test rbx, rbx\n"
+						fprintf(out, "push 0\n"
 									 "je else%d\n", counter);
 					}
 				}
-				IfCounter++;
+				ifCounter++;
 				nodeToAsm(node->right->left, out);
 				fprintf(out, "jmp if%d_end\n"
 							 "else%d:\n", counter, counter);
 				nodeToAsm(node->right->right, out);
 				fprintf(out, "if%d_end:\n", counter);
+				return 1;
 			}
-			
-			return 1;
 		case WHILE:
-			
-			fprintf(out, "loop%d:\n", LoopCounter);
-			int counter = LoopCounter;
+			fprintf(out, "loop%d:\n", loopCounter);
+			int counter = loopCounter;
 			nodeToAsm(node->left, out);
 			if (node->left->val->type != OP) {
-				fprintf(out, "pop rax\n"
-							 "test rax, rax\n"
+				fprintf(out, "push 0\n"
 							 "je loop%d_end\n", counter);
 			} else {
-				fprintf(out, "pop rbx\n"
-							 "pop rax\n"
-							 "cmp rax, rbx\n");
 				switch (node->left->val->val) {
 				case LESS_EQUAL:
 					fprintf(out, "ja loop%d_end\n", counter);
@@ -304,50 +296,47 @@ int nodeToAsm(t_node *node, FILE *out) {
 					fprintf(out, "je loop%d_end\n", counter);
 					break;
 				default:
-					fprintf(out, "push rax\n"
-								 "test rbx, rbx\n"
+					fprintf(out, "push 0\n"
 								 "je loop%d_end\n", counter);
 				}
 			}
-			LoopCounter++;
+			loopCounter++;
 			nodeToAsm(node->right, out);
 			fprintf(out, "jmp loop%d\n", counter);
 			fprintf(out, "loop%d_end:\n", counter);
-			
 			return 1;
 		
 		case ASSIGMENT:
 			nodeToAsm(node->right, out);
-			fprintf(out, "pop [rbp + (%d)]\n", computeOffset(node->left->val->val));
+			fprintf(out, "popr r%d\n", node->left->val->val);
 			return 1;
+//
+//		case 'm':
+//			fprintf(out, "meow\n");
+//			return 1;
+//		case 'd':
+//			fprintf(out, "dump\n");
+//			return 1;
+
+//		case 's':
+//			nodeToAsm(node->right, out);
+//			fprintf(out, "sqrt\n");
+//			return 1;
 		
 		case OUT:
 			nodeToAsm(node->right, out);
-			fprintf(out, "call out\n");
+			fprintf(out, "out\n");
 			return 1;
 		case IN:
-			fprintf(out, "sub rsp, 8\n"
-						 "call in\n");
+			fprintf(out, "in\n");
 			return 1;
 		
 		case RETURN:
-			
 			if (node->right == NULL)
-				fprintf(out, "mov rax, 0\n"
-							 "push rax\n");
+				fprintf(out, "push 0\n");
 			else
 				nodeToAsm(node->right, out);
-			if (!Main) {
-				fprintf(out, "pop rax\n"
-							 "mov [rbp + (%d)], rax\n"
-							 "leave\n"
-							 "ret\n", computeOffset(-1));
-			} else {
-				fprintf(out, "xor rdi, rdi\n"
-							 "leave\n"
-							 "mov rax, 0x3c\n"
-							 "syscall\n");
-			}
+			fprintf(out, "ret\n");
 			return 1;
 		
 		default:
@@ -364,11 +353,7 @@ int treeToAsm(t_node *root, char *file) {
 	
 	FILE *out = fopen(file, "wb");
 	
-	fprintf(out, ".intel_syntax noprefix\n"
-				 "\n"
-				 "\t\t.globl _start\n"
-				 "\n"
-				 ".text\n");
+	fprintf(out, "jmp main\n");
 	nodeToAsm(root, out);
 	
 	fclose(out);

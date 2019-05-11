@@ -71,5 +71,8 @@ compiler: language/compiler.c tree.o textProcessor.o map.o stack.o
 backEndRealCPU: language/backEndRealCPU.c tree.o textProcessor.o map.o stack.o
 	$(CC) -g -o $(BDIR)/backEndRealCPU $(CFLAGS) language/backEndRealCPU.c $(ODIR)/textProcessor.o $(ODIR)/tree.o $(ODIR)/map.o $(ODIR)/list.o $(ODIR)/stack.o
 
+backEndSoftCPU: language/backEndSoftCPU.c tree.o textProcessor.o map.o stack.o
+	$(CC) -g -o $(BDIR)/backEndSoftCPU $(CFLAGS) language/backEndSoftCPU.c $(ODIR)/textProcessor.o $(ODIR)/tree.o $(ODIR)/map.o $(ODIR)/list.o $(ODIR)/stack.o
+
 frontEnd: language/frontEnd.c tree.o textProcessor.o map.o stack.o
 	$(CC) -g -o $(BDIR)/frontEnd $(CFLAGS) language/frontEnd.c $(ODIR)/textProcessor.o $(ODIR)/tree.o $(ODIR)/map.o $(ODIR)/list.o $(ODIR)/stack.o
