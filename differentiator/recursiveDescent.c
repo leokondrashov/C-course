@@ -10,12 +10,12 @@
 #define sassert(expr) \
 if (!(expr)) { \
     printf("unknown symbol %c\n", *s); \
-    Error = 1; \
+    error = 1; \
 }
 
 #define BUFF_SIZE 100
 
-int Error = 0;
+int error = 0;
 char *s = NULL;
 
 //int main() {
@@ -29,7 +29,7 @@ char *s = NULL;
 //	t.root = root;
 //	if (error == 0)
 //		treeDump(&t);
-//	mFreeNodes(root);
+//	freeNodes(root);
 //	free(buff);
 //}
 
@@ -40,7 +40,7 @@ t_node *getG(char *str) {
 	t_node *val = getE();
 	sassert(*s == '\0');
 	s++;
-	if (Error) {
+	if (error) {
 		freeNodes(val);
 		val = NULL;
 	}

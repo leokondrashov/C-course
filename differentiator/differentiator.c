@@ -7,6 +7,7 @@
 #include <time.h>
 #include "recursiveDescent.h"
 #include "DSL.h"
+#include <string.h>
 
 #define BUFF_SIZE 100
 
@@ -39,6 +40,9 @@ int main(int argc, char *argv[]) {
 	if (argc == 1) {
 		buff = (char *) calloc(BUFF_SIZE + 1, sizeof(char));
 		fgets(buff, BUFF_SIZE, stdin);
+		int len = strlen(buff);
+		if (buff[len - 1] == '\n')
+			buff[len - 1] = '\0';
 	} else {
 		int fileSize = sizeofFile(argv[1]);
 		if (fileSize < 0) {
@@ -337,8 +341,8 @@ int simplify(const t_node *root, t_node *node) {
 		node->val->val = L->val->val;
 		
 		freeNodes(R);
-		L = tmp->left;
-		R = tmp->right;
+		L = L->left;
+		R = L->right;
 		tmp->left = NULL;
 		tmp->right = NULL;
 		freeNodes(tmp);
