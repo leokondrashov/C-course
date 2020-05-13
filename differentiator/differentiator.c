@@ -28,6 +28,7 @@ void initLatex(const char *file);
 void closeLatex();
 void printLatex(const t_node *node, char parentOperation);
 void printDerivative(const t_node *source, const t_node *derivative);
+void printSimplified(const t_node *soerce);
 t_node *differentiate(const t_node *node);
 t_node *copy(const t_node *node);
 int presence(char operation);
@@ -63,11 +64,13 @@ int main(int argc, char *argv[]) {
 	
 	initLatex("a.tex");
 	t_node *derivative = differentiate(root);
+	printDerivative(root, derivative);
 	simplify(derivative, derivative);
+	printSimplified(derivative);
 //	tree t = {};
 //	t.root = derivative;
 //	treeDump(&t);
-//	printLatex(derivative, "\0");
+
 //	treeSaveToFile(&t, "derivative.txt");
 	closeLatex();
 	free(buff);
@@ -228,7 +231,7 @@ t_node *differentiate(const t_node *node) {
 		#define DEF_OP(name, code, diff) \
         if (code == (char) node->val->val) { \
             t_node *derivative = diff; \
-            printDerivative(node, derivative); \
+            /*printDerivative(node, derivative);*/ \
             return derivative; \
         }
 		#include "operations.h"
@@ -300,7 +303,7 @@ int simplify(const t_node *root, t_node *node) {
 		
 		node->val->type = CONST;
 		node->val->val = res;
-		printSimplified(root);
+		//printSimplified(root);
 		return 1;
 	}
 	
@@ -314,7 +317,7 @@ int simplify(const t_node *root, t_node *node) {
 		L = NULL;
 		R = NULL;
 		
-		printSimplified(root);
+		//printSimplified(root);
 		return 1;
 	}
 	
@@ -330,7 +333,7 @@ int simplify(const t_node *root, t_node *node) {
 		tmp->right = NULL;
 		freeNodes(tmp);
 		
-		printSimplified(root);
+		//printSimplified(root);
 		return 1;
 	}
 	
@@ -347,7 +350,7 @@ int simplify(const t_node *root, t_node *node) {
 		tmp->right = NULL;
 		freeNodes(tmp);
 		
-		printSimplified(root);
+		//printSimplified(root);
 		return 1;
 	}
 	
